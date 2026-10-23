@@ -281,6 +281,94 @@ class _ChatHomeState extends State<ChatHome> {
     return 'image/jpeg';
   }
 
+  Future<void> _generateImage() async {
+    final prompt = _imagePrompt.text.trim();
+    if (prompt.isEmpty) {
+      _showInfo('Please describe the image first.');
+      return;
+    }
+    if (_generatingImage) return;
+
+    setState(() {
+      _generatingImage = true;
+      _imageReady = false;
+    });
+
+    try {
+      if (ApiService.isConfigured) {
+        final generated = await _api.generateImage(prompt);
+        final bytes = await _api.downloadGeneratedImage(generated);
+        if (!mounted) return;
+        setState(() {
+          _generatedImage = generated;
+          _generatedImageBytes = bytes;
+          _generatedImageUrl = generated.imageUrl;
+          _generatingImage = false;
+          _imageReady = true;
+        });
+        _showInfo('Image generated successfully.');
+      } else {
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+        if (!mounted) return;
+        setState(() {
+          _generatingImage = false;
+          _imageReady = true;
+        });
+        _showInfo('Preview only. Configure API_BASE_URL to enable Cloudflare image generation.');
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _generatingImage = false;
+        _imageReady = _generatedImageBytes != null || _generatedImageUrl != null;
+      });
+      _showInfo('Image generation failed: ' + error.toString());
+    }
+  }
+
+  Future<void> _downloadImage() async {
+    try {
+      Uint8List? bytes = _generatedImageBytes;
+      if (bytes == null && _generatedImage != null) {
+        bytes = await _api.downloadGeneratedImage(_generatedImage!);
+      }
+      if (bytes == null) {
+        _showInfo('Generate an image before downloading it.');
+        return;
+      }
+      await FileSaver.instance.saveFile(
+        name: 'ai-chat-generated-image',
+        bytes: bytes,
+        fileExtension: 'jpg',
+        mimeType: MimeType.jpeg,
+      );
+      _showInfo('Image export started.');
+    } catch (error) {
+      _showInfo('Could not download image: ' + error.toString());
+    }
+  }
+
+  void _setFeedback(ChatMessage message, String reaction) {
+    final next = message.feedback == reaction ? null : reaction;
+    setState(() => message.feedback = next);
+    if (ApiService.isConfigured && message.id != null) {
+      unawaited(
+        _api
+            .sendFeedback(messageId: message.id!, reaction: next)
+            .catchError((Object error) {
+          if (mounted) _showInfo('Could not save feedback.');
+        }),
+      );
+    }
+  }
+
+  String _mimeTypeForImage(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
   Future<void> _sendMessage() async {
     final rawPrompt = _composer.text.trim();
     if ((rawPrompt.isEmpty && _attachedImage == null) || _busy) return;
@@ -1410,21 +1498,7 @@ class _ChatHomeState extends State<ChatHome> {
             width: double.infinity,
             height: 40,
             child: FilledButton.icon(
-              onPressed: _generatingImage
-                  ? null
-                  : () async {
-                      setState(() {
-                        _generatingImage = true;
-                        _imageReady = false;
-                      });
-                      await Future<void>.delayed(const Duration(milliseconds: 1200));
-                      if (!mounted) return;
-                      setState(() {
-                        _generatingImage = false;
-                        _imageReady = true;
-                      });
-                      _showInfo('Preview generated. Real image generation will be connected later.');
-                    },
+              onPressed: _generatingImage ? null : _generateImage,
               style: FilledButton.styleFrom(
                 backgroundColor: brandPurple,
                 foregroundColor: Colors.white,
@@ -1441,12 +1515,26 @@ class _ChatHomeState extends State<ChatHome> {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _imageReady
-                  ? Image.network(
-                      landscapeUrl,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
-                    )
+                  ? (_generatedImageBytes != null
+                      ? Image.memory(
+                          _generatedImageBytes!,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                        )
+                      : (_generatedImageUrl != null
+                          ? Image.network(
+                              _generatedImageUrl!,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                            )
+                          : Image.network(
+                              landscapeUrl,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                            )))
                   : Container(
                       color: widget.dark ? const Color(0xFF17243A) : const Color(0xFFF1F4FD),
                       child: Center(
@@ -1469,7 +1557,7 @@ class _ChatHomeState extends State<ChatHome> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _showInfo('Download action will use the generated asset URL after backend integration.'),
+                  onPressed: _downloadImage,
                   icon: const Icon(Icons.download_rounded, size: 15),
                   label: const Text('Download', style: TextStyle(fontSize: 10)),
                   style: OutlinedButton.styleFrom(foregroundColor: _text, side: BorderSide(color: _line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
@@ -1478,19 +1566,7 @@ class _ChatHomeState extends State<ChatHome> {
               const SizedBox(width: 7),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _imageReady = false;
-                      _generatingImage = true;
-                    });
-                    Future<void>.delayed(const Duration(milliseconds: 900), () {
-                      if (!mounted) return;
-                      setState(() {
-                        _imageReady = true;
-                        _generatingImage = false;
-                      });
-                    });
-                  },
+                  onPressed: _generateImage,
                   icon: const Icon(Icons.refresh_rounded, size: 15),
                   label: const Text('Regenerate', style: TextStyle(fontSize: 10)),
                   style: OutlinedButton.styleFrom(foregroundColor: _text, side: BorderSide(color: _line), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
