@@ -148,6 +148,20 @@ class _ChatHomeState extends State<ChatHome> {
   Color get _muted => widget.dark ? const Color(0xFF91A0B8) : const Color(0xFF71809A);
   Color get _line => widget.dark ? const Color(0xFF253248) : lineLight;
 
+  String get _modelLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
+        'auto' => 'Auto · Recommended',
+        _ => 'Groq · GPT-OSS 20B',
+      };
+
+  String get _modelShortLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Qwen 3.8',
+        'auto' => 'Auto',
+        _ => 'GPT-OSS 20B',
+      };
+
   @override
   void initState() {
     super.initState();
