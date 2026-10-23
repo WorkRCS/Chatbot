@@ -276,8 +276,28 @@ class _ChatHomeState extends State<ChatHome> {
             .toList();
       });
       _scrollToBottom();
+      unawaited(_hydrateSavedImages());
     } catch (error) {
       _showInfo(error.toString());
+    }
+  }
+
+  Future<void> _hydrateSavedImages() async {
+    final pending = _messages.where((message) =>
+      message.generatedImage != null &&
+      message.generatedImage!.storedInR2 &&
+      message.generatedImageBytes == null).toList();
+
+    for (final message in pending) {
+      try {
+        final image = message.generatedImage;
+        if (image == null) continue;
+        final bytes = await _api.downloadGeneratedImage(image);
+        if (!mounted) return;
+        setState(() => message.generatedImageBytes = bytes);
+      } catch (_) {
+        // Keep the transcript usable when a saved asset is no longer accessible.
+      }
     }
   }
 
