@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -148,34 +147,6 @@ class _ChatHomeState extends State<ChatHome> {
   Color get _text => widget.dark ? const Color(0xFFF1F5F9) : const Color(0xFF17233B);
   Color get _muted => widget.dark ? const Color(0xFF91A0B8) : const Color(0xFF71809A);
   Color get _line => widget.dark ? const Color(0xFF253248) : lineLight;
-
-  String get _modelLabel => switch (_model) {
-        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
-        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
-        'auto' => 'Auto · Recommended',
-        _ => 'Groq · GPT-OSS 20B',
-      };
-
-  String get _modelShortLabel => switch (_model) {
-        'openai/gpt-oss-120b' => 'GPT-OSS 120B',
-        'qwen/qwen3.8-27b' => 'Qwen 3.8',
-        'auto' => 'Auto',
-        _ => 'GPT-OSS 20B',
-      };
-
-  String get _modelLabel => switch (_model) {
-        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
-        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
-        'auto' => 'Auto · Recommended',
-        _ => 'Groq · GPT-OSS 20B',
-      };
-
-  String get _modelShortLabel => switch (_model) {
-        'openai/gpt-oss-120b' => 'GPT-OSS 120B',
-        'qwen/qwen3.8-27b' => 'Qwen 3.8',
-        'auto' => 'Auto',
-        _ => 'GPT-OSS 20B',
-      };
 
   @override
   void initState() {
@@ -1220,7 +1191,7 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Text('AI Assistant', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w800)),
                     const SizedBox(width: 8),
-                    Text(_model, style: TextStyle(color: _muted, fontSize: 10)),
+                    Text(_modelLabel, style: TextStyle(color: _muted, fontSize: 10)),
                     const Spacer(),
                     Icon(Icons.more_horiz_rounded, size: 18, color: _muted),
                   ],
@@ -1634,7 +1605,7 @@ class _ChatHomeState extends State<ChatHome> {
                               children: [
                                 Icon(Icons.bubble_chart_rounded, color: _muted, size: 14),
                                 const SizedBox(width: 5),
-                                Flexible(child: Flexible(child: Text(_modelShortLabel, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted)))),
+                                Flexible(child: Text(_modelShortLabel, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted))),
                                 Icon(Icons.keyboard_arrow_down_rounded, color: _muted, size: 14),
                               ],
                             ),
