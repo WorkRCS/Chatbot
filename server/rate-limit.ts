@@ -11,7 +11,7 @@ export async function enforceRateLimit(
   const now = Date.now();
   const windowStart = Math.floor(now / windowMs) * windowMs;
   const id = route + ":" + guestId;
-  const result = await db.collection("rate_limits").findOneAndUpdate(
+  const result = await db.collection<any>("rate_limits").findOneAndUpdate(
     { _id: id },
     [
       {
