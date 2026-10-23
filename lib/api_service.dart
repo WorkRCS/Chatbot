@@ -132,6 +132,7 @@ class ApiStoredMessage {
     this.feedback,
     this.sources = const [],
     this.generatedImage,
+    this.attachment,
   });
 
   final String id;
@@ -141,6 +142,7 @@ class ApiStoredMessage {
   final String? feedback;
   final List<Map<String, dynamic>> sources;
   final GeneratedImage? generatedImage;
+  final Map<String, dynamic>? attachment;
 
   factory ApiStoredMessage.fromJson(Map<String, dynamic> json) {
     return ApiStoredMessage(
@@ -157,6 +159,9 @@ class ApiStoredMessage {
           : const [],
       generatedImage: json['generatedImage'] is Map
           ? GeneratedImage.fromJson(Map<String, dynamic>.from(json['generatedImage'] as Map))
+          : null,
+      attachment: json['attachment'] is Map
+          ? Map<String, dynamic>.from(json['attachment'] as Map)
           : null,
     );
   }
@@ -365,6 +370,23 @@ class ApiService {
       method: 'POST',
       body: {'messageId': messageId, 'reaction': reaction},
     );
+  }
+
+  Future<Uint8List> downloadAsset(String assetId) async {
+    final data = await _requestJson(
+      '/api/assets?id=' + Uri.encodeQueryComponent(assetId),
+    );
+    final url = data['url'] as String?;
+    if (url == null || url.isEmpty) {
+      throw ChatApiException('The stored image URL is not available.');
+    }
+    final response = await _client
+        .get(Uri.parse(url))
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ChatApiException('Could not download the stored image.');
+    }
+    return response.bodyBytes;
   }
 
   Future<Uint8List> downloadGeneratedImage(GeneratedImage image) async {
