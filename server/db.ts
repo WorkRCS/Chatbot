@@ -32,6 +32,7 @@ export async function getDb(): Promise<Db> {
       db.collection("feedback").createIndex({ userId: 1, messageId: 1 }, { unique: true }),
       db.collection("assets").createIndex({ userId: 1, createdAt: -1 }),
       db.collection("rate_limits").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      db.collection("guest_sessions").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
     ]).then(() => undefined);
   }
 
