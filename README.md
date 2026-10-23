@@ -18,6 +18,7 @@ Responsive Flutter AI chat app with a Vercel Serverless API, Groq streaming chat
 - \`POST /api/session\`: signed 30-day guest session.
 - \`POST /api/chat\`: SSE streaming Groq response, model fallback, optional Tavily search, message persistence.
 - \`POST /api/image\`: Cloudflare Workers AI FLUX image generation; saves prompt and result metadata.
+- \`GET /api/assets?id=...\`: guest-owned, short-lived signed URLs for private R2 images.
 - \`GET /api/conversations\` and \`GET /api/conversations?id=...\`: conversation/message history.
 - \`POST /api/feedback\`: like/dislike persistence.
 - \`GET /api/health\`: reports which integrations are configured without exposing keys.
@@ -51,7 +52,7 @@ Generate \`SESSION_SECRET\` locally with \`openssl rand -base64 48\`; paste the 
 
 **Cloudflare:** create an API token with Workers AI permissions. FLUX generation may consume paid/free allocation depending on the account's current quota and model pricing.
 
-**R2:** image generation returns the image bytes to the app even without R2, but the actual image binary is only retained across sessions when R2 is configured. For private buckets, the API returns time-limited signed URLs. Add R2 settings if you want generated images to remain downloadable later.
+**R2:** chat image uploads and generated image binaries are retained across sessions only when R2 is configured. Without R2, the current upload can still be sent for vision and a generated image can still be downloaded immediately, but its binary cannot be restored from old history later. For private buckets, the API returns fresh, time-limited signed URLs. Add R2 settings if you want durable image history.
 
 After adding or changing environment variables, redeploy so the functions receive them.
 
