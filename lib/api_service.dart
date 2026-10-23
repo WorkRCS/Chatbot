@@ -65,6 +65,8 @@ class GeneratedImage {
     required this.mimeType,
     this.dataUrl,
     this.imageUrl,
+    this.conversationId,
+    this.messageId,
   });
 
   final String assetId;
@@ -72,6 +74,8 @@ class GeneratedImage {
   final String mimeType;
   final String? dataUrl;
   final String? imageUrl;
+  final String? conversationId;
+  final String? messageId;
 
   Uint8List? get bytes {
     final value = dataUrl;
@@ -90,6 +94,8 @@ class GeneratedImage {
       mimeType: json['mimeType'] as String? ?? 'image/jpeg',
       dataUrl: json['dataUrl'] as String?,
       imageUrl: json['imageUrl'] as String?,
+      conversationId: json['conversationId'] as String?,
+      messageId: json['messageId'] as String?,
     );
   }
 }
@@ -309,11 +315,11 @@ class ApiService {
     }
   }
 
-  Future<GeneratedImage> generateImage(String prompt) async {
+  Future<GeneratedImage> generateImage(String prompt, {String? conversationId}) async {
     final data = await _requestJson(
       '/api/image',
       method: 'POST',
-      body: {'prompt': prompt},
+      body: {'prompt': prompt, 'conversationId': conversationId},
     );
     return GeneratedImage.fromJson(data);
   }
