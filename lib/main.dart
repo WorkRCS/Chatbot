@@ -80,6 +80,8 @@ class ChatMessage {
     this.attachment,
     this.id,
     this.sources = const [],
+    this.generatedImage,
+    this.generatedImageBytes,
   });
 
   final bool isUser;
@@ -90,6 +92,8 @@ class ChatMessage {
   PlatformFile? attachment;
   String? id;
   List<Map<String, dynamic>> sources;
+  GeneratedImage? generatedImage;
+  Uint8List? generatedImageBytes;
 }
 
 class ChatHome extends StatefulWidget {
@@ -277,6 +281,39 @@ class _ChatHomeState extends State<ChatHome> {
     }
   }
 
+  bool _isImageGenerationRequest(String prompt) {
+    final english = RegExp(
+      r'\b(generate|create|draw|make|design|paint|illustrate)\b.{0,100}\b(image|picture|illustration|artwork|logo|wallpaper|poster|portrait|graphic|icon)\b',
+      caseSensitive: false,
+    ).hasMatch(prompt) ||
+        RegExp(
+          r'\b(image|picture|illustration|artwork|logo|wallpaper|poster)\b.{0,80}\b(of|with|showing)\b',
+          caseSensitive: false,
+        ).hasMatch(prompt);
+    final bengali = RegExp(r'(ছবি|ইমেজ).{0,80}(বানাও|তৈরি|আঁকো|জেনারেট|করো)|(বানাও|তৈরি করো|আঁকো).{0,80}(ছবি|ইমেজ)').hasMatch(prompt);
+    return english || bengali;
+  }
+
+  Future<void> _downloadMessageImage(ChatMessage message) async {
+    final generated = message.generatedImage;
+    if (generated == null) {
+      _showInfo('The generated image is not available to download.');
+      return;
+    }
+    try {
+      final bytes = message.generatedImageBytes ?? await _api.downloadGeneratedImage(generated);
+      await FileSaver.instance.saveFile(
+        name: 'ai-chat-generated-image',
+        bytes: bytes,
+        fileExtension: 'jpg',
+        mimeType: MimeType.jpeg,
+      );
+      _showInfo('Image export started.');
+    } catch (error) {
+      _showInfo('Could not download image: ' + error.toString());
+    }
+  }
+
   String _mimeTypeForImage(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -387,6 +424,56 @@ class _ChatHomeState extends State<ChatHome> {
       _attachedImage = null;
     });
     _scrollToBottom();
+
+    if (attachment == null && _isImageGenerationRequest(prompt)) {
+      if (!ApiService.isConfigured) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        if (!mounted) return;
+        setState(() {
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..text = 'Image-generation intent detected. Configure API_BASE_URL to connect Cloudflare Workers AI.';
+          }
+          _busy = false;
+        });
+        return;
+      }
+
+      try {
+        final generated = await _api.generateImage(
+          prompt,
+          conversationId: _activeConversationId,
+        );
+        final bytes = await _api.downloadGeneratedImage(generated);
+        if (!mounted) return;
+        setState(() {
+          _activeConversationId = generated.conversationId ?? _activeConversationId;
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..id = generated.messageId
+              ..text = 'Generated image'
+              ..generatedImage = generated
+              ..generatedImageBytes = bytes;
+          }
+          _busy = false;
+        });
+        unawaited(_refreshHistory());
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..text = 'Image generation failed: ' + error.toString();
+          }
+          _busy = false;
+        });
+      }
+      _scrollToBottom();
+      return;
+    }
 
     if (ApiService.isConfigured) {
       try {
@@ -1109,6 +1196,31 @@ class _ChatHomeState extends State<ChatHome> {
                 ),
                 const SizedBox(height: 14),
                 if (message.isPhysicsSample) _physicsAnswer() else _plainAnswer(message.text),
+                if (message.generatedImageBytes != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.memory(
+                      message.generatedImageBytes!,
+                      width: 420,
+                      height: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                    ),
+                  ),
+                ] else if (message.generatedImage?.imageUrl != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      message.generatedImage!.imageUrl!,
+                      width: 420,
+                      height: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                    ),
+                  ),
+                ],
                 if (message.sources.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -1160,6 +1272,8 @@ class _ChatHomeState extends State<ChatHome> {
                       () => _setFeedback(message, 'dislike'),
                       active: message.feedback == 'dislike',
                     ),
+                    if (message.generatedImage != null)
+                      _messageAction(Icons.download_rounded, 'Download image', () => _downloadMessageImage(message)),
                     _messageAction(Icons.picture_as_pdf_outlined, 'Download PDF', _exportPdf),
                   ],
                 ),
