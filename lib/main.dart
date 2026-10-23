@@ -1319,7 +1319,8 @@ class _ChatHomeState extends State<ChatHome> {
                     ),
                   ),
                 ),
-              );
+              ),
+            );
             },
           ),
         ),
@@ -1474,7 +1475,8 @@ class _ChatHomeState extends State<ChatHome> {
                     ),
                   ),
                 ),
-              );
+              ),
+            );
             },
           ),
         ),
