@@ -1285,57 +1285,90 @@ class _ChatHomeState extends State<ChatHome> {
       children: [
         _topBar(includeModel: false),
         Expanded(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1050),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Expanded(flex: 4, child: _imagePanelContent()),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 5,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _surface,
-                          border: Border.all(color: _line),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.all(17),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Your generated image', style: TextStyle(color: _text, fontWeight: FontWeight.w800, fontSize: 15)),
-                            const SizedBox(height: 5),
-                            Text('Preview image output and download controls', style: TextStyle(color: _muted, fontSize: 11)),
-                            const SizedBox(height: 16),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(landscapeUrl, fit: BoxFit.cover, width: double.infinity, errorBuilder: (context, error, stack) => _landscapePlaceholder()),
-                              ),
-                            ),
-                            const SizedBox(height: 13),
-                            Row(
-                              children: [
-                                Expanded(child: OutlinedButton.icon(onPressed: () => _showInfo('Download will be enabled when image storage is connected.'), icon: const Icon(Icons.download_rounded, size: 16), label: const Text('Download image'))),
-                                const SizedBox(width: 10),
-                                Expanded(child: FilledButton.icon(onPressed: () => _showInfo('Real image generation will be wired to Cloudflare Workers AI.'), icon: const Icon(Icons.refresh_rounded, size: 16), label: const Text('Regenerate'))),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 760;
+              if (narrow) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      SizedBox(height: 470, child: _imagePanelContent()),
+                      const SizedBox(height: 16),
+                      SizedBox(height: 500, child: _imagePreviewCard()),
+                    ],
+                  ),
+                );
+              }
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1050),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(flex: 4, child: _imagePanelContent()),
+                        const SizedBox(width: 20),
+                        Expanded(flex: 5, child: _imagePreviewCard()),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _imagePreviewCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Your generated image', style: TextStyle(color: _text, fontWeight: FontWeight.w800, fontSize: 15)),
+          const SizedBox(height: 5),
+          Text('Preview image output and download controls', style: TextStyle(color: _muted, fontSize: 11)),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                landscapeUrl,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+              ),
+            ),
+          ),
+          const SizedBox(height: 13),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _showInfo('Download will be enabled when image storage is connected.'),
+                icon: const Icon(Icons.download_rounded, size: 16),
+                label: const Text('Download image'),
+              ),
+              FilledButton.icon(
+                onPressed: () => _showInfo('Real image generation will be wired to Cloudflare Workers AI.'),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Regenerate'),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1406,99 +1439,134 @@ class _ChatHomeState extends State<ChatHome> {
       children: [
         _topBar(includeModel: false),
         Expanded(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 980),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        decoration: BoxDecoration(color: _surface, border: Border.all(color: _line), borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.all(22),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFE85A7A), size: 32),
-                            const SizedBox(height: 16),
-                            Text('Export chat as PDF', style: TextStyle(color: _text, fontSize: 20, fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 8),
-                            Text('Save a clean copy of this answer or the whole conversation.', style: TextStyle(color: _muted, fontSize: 12, height: 1.5)),
-                            const SizedBox(height: 20),
-                            _featureLine(Icons.description_outlined, 'Readable headings and paragraphs'),
-                            _featureLine(Icons.functions_rounded, 'Step-by-step solution content'),
-                            _featureLine(Icons.file_download_outlined, 'Print, save, or share PDF'),
-                            const Spacer(),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 46,
-                              child: FilledButton.icon(
-                                onPressed: _exportPdf,
-                                icon: const Icon(Icons.download_rounded, size: 17),
-                                label: const Text('Export conversation to PDF'),
-                                style: FilledButton.styleFrom(backgroundColor: brandBlue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11))),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text('PDF is generated locally in this frontend preview.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 9.5)),
-                          ],
-                        ),
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 720;
+              if (narrow) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      SizedBox(height: 380, child: _pdfExportCard()),
+                      const SizedBox(height: 16),
+                      SizedBox(height: 500, child: _pdfPreviewCard()),
+                    ],
+                  ),
+                );
+              }
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 980),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: _pdfExportCard()),
+                        const SizedBox(width: 20),
+                        Expanded(flex: 4, child: _pdfPreviewCard()),
+                      ],
                     ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 4,
-                      child: Container(
-                        decoration: BoxDecoration(color: widget.dark ? const Color(0xFF101827) : const Color(0xFFE9EEF7), borderRadius: BorderRadius.circular(16)),
-                        padding: const EdgeInsets.all(22),
-                        child: Center(
-                          child: AspectRatio(
-                            aspectRatio: 0.76,
-                            child: Container(
-                              color: Colors.white,
-                              padding: const EdgeInsets.all(19),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Row(children: [Icon(Icons.auto_awesome, color: brandBlue, size: 16), SizedBox(width: 6), Text('AI Chat Export', style: TextStyle(color: Color(0xFF17233B), fontSize: 12, fontWeight: FontWeight.w800))]),
-                                  const SizedBox(height: 16),
-                                  const Text('Physics Problem Solution', style: TextStyle(color: Color(0xFF17233B), fontWeight: FontWeight.w800, fontSize: 13)),
-                                  const SizedBox(height: 9),
-                                  const Text('Given data', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
-                                  const SizedBox(height: 5),
-                                  const Text('u = 20 m/s\ng = 9.8 m/s²', style: TextStyle(color: Color(0xFF34445F), fontSize: 9, height: 1.5)),
-                                  const SizedBox(height: 12),
-                                  const Text('Maximum height', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
-                                  const SizedBox(height: 5),
-                                  const Text('h = u² / (2g)\n  = 400 / 19.6\n  ≈ 20.41 m', style: TextStyle(color: Color(0xFF34445F), fontSize: 9, height: 1.6)),
-                                  const SizedBox(height: 12),
-                                  const Text('Final answer', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
-                                  const SizedBox(height: 5),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(9),
-                                    decoration: BoxDecoration(color: const Color(0xFFEEF3FF), borderRadius: BorderRadius.circular(7)),
-                                    child: const Text('Maximum height: 20.41 m\nTotal time: 4.08 s', style: TextStyle(color: Color(0xFF17233B), fontSize: 9, height: 1.5)),
-                                  ),
-                                  const Spacer(),
-                                  const Divider(color: Color(0xFFE5EAF3)),
-                                  const Text('Generated from your conversation', style: TextStyle(color: Color(0xFF8B97AB), fontSize: 7.5)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+
+  Widget _pdfExportCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _surface,
+        border: Border.all(color: _line),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.picture_as_pdf_rounded, color: Color(0xFFE85A7A), size: 32),
+          const SizedBox(height: 16),
+          Text('Export chat as PDF', style: TextStyle(color: _text, fontSize: 20, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text('Save a clean copy of this answer or the whole conversation.', style: TextStyle(color: _muted, fontSize: 12, height: 1.5)),
+          const SizedBox(height: 20),
+          _featureLine(Icons.description_outlined, 'Readable headings and paragraphs'),
+          _featureLine(Icons.functions_rounded, 'Step-by-step solution content'),
+          _featureLine(Icons.file_download_outlined, 'Print, save, or share PDF'),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: FilledButton.icon(
+              onPressed: _exportPdf,
+              icon: const Icon(Icons.download_rounded, size: 17),
+              label: const Text('Export conversation to PDF'),
+              style: FilledButton.styleFrom(
+                backgroundColor: brandBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text('PDF is generated locally in this frontend preview.', textAlign: TextAlign.center, style: TextStyle(color: _muted, fontSize: 9.5)),
+        ],
+      ),
+    );
+  }
+
+  Widget _pdfPreviewCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: widget.dark ? const Color(0xFF101827) : const Color(0xFFE9EEF7),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      padding: const EdgeInsets.all(22),
+      child: Center(
+        child: AspectRatio(
+          aspectRatio: 0.76,
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(19),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(children: [
+                  Icon(Icons.auto_awesome, color: brandBlue, size: 16),
+                  SizedBox(width: 6),
+                  Text('AI Chat Export', style: TextStyle(color: Color(0xFF17233B), fontSize: 12, fontWeight: FontWeight.w800)),
+                ]),
+                const SizedBox(height: 16),
+                const Text('Physics Problem Solution', style: TextStyle(color: Color(0xFF17233B), fontWeight: FontWeight.w800, fontSize: 13)),
+                const SizedBox(height: 9),
+                const Text('Given data', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
+                const SizedBox(height: 5),
+                const Text('u = 20 m/s\ng = 9.8 m/s²', style: TextStyle(color: Color(0xFF34445F), fontSize: 9, height: 1.5)),
+                const SizedBox(height: 12),
+                const Text('Maximum height', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
+                const SizedBox(height: 5),
+                const Text('h = u² / (2g)\n  = 400 / 19.6\n  ≈ 20.41 m', style: TextStyle(color: Color(0xFF34445F), fontSize: 9, height: 1.6)),
+                const SizedBox(height: 12),
+                const Text('Final answer', style: TextStyle(color: Color(0xFF4268F6), fontWeight: FontWeight.w700, fontSize: 10)),
+                const SizedBox(height: 5),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(color: const Color(0xFFEEF3FF), borderRadius: BorderRadius.circular(7)),
+                  child: const Text('Maximum height: 20.41 m\nTotal time: 4.08 s', style: TextStyle(color: Color(0xFF17233B), fontSize: 9, height: 1.5)),
+                ),
+                const Spacer(),
+                const Divider(color: Color(0xFFE5EAF3)),
+                const Text('Generated from your conversation', style: TextStyle(color: Color(0xFF8B97AB), fontSize: 7.5)),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
