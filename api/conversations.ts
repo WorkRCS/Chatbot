@@ -14,13 +14,13 @@ export default async function handler(request: Request): Promise<Response> {
     const conversationId = new URL(request.url).searchParams.get("id");
 
     if (request.method === "GET" && conversationId) {
-      const conversation = await db.collection("conversations").findOne({
+      const conversation = await db.collection<any>("conversations").findOne({
         _id: conversationId,
         userId,
       });
       if (!conversation) return json(request, { error: "Conversation not found." }, 404);
 
-      const messages = await db.collection("messages")
+      const messages = await db.collection<any>("messages")
         .find({ conversationId, userId })
         .sort({ createdAt: 1 })
         .limit(300)
@@ -48,7 +48,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     if (request.method === "GET") {
-      const conversations = await db.collection("conversations")
+      const conversations = await db.collection<any>("conversations")
         .find({ userId })
         .sort({ updatedAt: -1 })
         .limit(60)
