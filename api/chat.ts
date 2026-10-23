@@ -48,11 +48,13 @@ function sseEvent(data: unknown): Uint8Array {
 
 function selectModels(requested: string, hasImage: boolean): string[] {
   if (hasImage) return ["qwen/qwen3.8-27b"];
-  const primary = MODEL_IDS.has(requested) && requested !== "qwen/qwen3.8-27b"
-    ? requested
-    : "openai/gpt-oss-20b";
-  const all = [primary, "openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.8-27b"];
-  return [...new Set(all)];
+  const primary = MODEL_IDS.has(requested) ? requested : "openai/gpt-oss-20b";
+  const fallback = [
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+  ].filter((model) => model !== primary);
+  return [primary, ...fallback];
 }
 
 async function startGroqStream(
@@ -79,7 +81,7 @@ async function startGroqStream(
           temperature: 0.35,
           max_tokens: 8192,
         }),
-        signal: AbortSignal.timeout(55_000),
+        signal: AbortSignal.timeout(22_000),
       });
     } catch {
       lastStatus = 0;
