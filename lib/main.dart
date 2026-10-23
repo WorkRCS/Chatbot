@@ -130,7 +130,7 @@ class _ChatHomeState extends State<ChatHome> {
         ChatMessage(
           isUser: true,
           text:
-              'Solve this physics problem step by step:\nA 2 kg ball is thrown vertically upward with a speed of 20 m/s. Find (a) the maximum height and (b) the total time in the air. Use g = 9.8 m/s².',
+              'Solve this physics problem step by step:\nA 2 kg ball is thrown vertically upward with a speed of 20 m/s. Find (a) the maximum height and (b) the total time in the air. Use g = 9.8 m/s^2.',
         ),
         ChatMessage(isUser: false, isPhysicsSample: true),
       ];
@@ -213,7 +213,16 @@ class _ChatHomeState extends State<ChatHome> {
 
   String _mockReply(String prompt) {
     final lower = prompt.toLowerCase();
-    if (lower.contains('image') || lower.contains('draw') || lower.contains('picture')) {
+    if (lower.contains('analyze the attached image') ||
+        lower.contains('what is in this image') ||
+        lower.contains('what do you see') ||
+        lower.contains('describe this image')) {
+      return 'Image received in the chat preview. Vision analysis will be powered by a Groq vision model after the backend is connected.';
+    }
+    if (lower.contains('generate an image') ||
+        lower.contains('create an image') ||
+        lower.contains('draw') ||
+        lower.contains('picture of')) {
       return 'I can help turn that idea into an image. Open Image Generation in the sidebar, describe the scene, and use Generate Image to preview the image-generation flow. Live generation will be connected in the backend phase.';
     }
     if (lower.contains('pdf')) {
@@ -241,7 +250,7 @@ class _ChatHomeState extends State<ChatHome> {
     final document = pw.Document();
     final lines = <pw.Widget>[
       pw.Text(
-        'AI Chat — Conversation Export',
+        'AI Chat - Conversation Export',
         style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
       ),
       pw.SizedBox(height: 6),
@@ -252,7 +261,7 @@ class _ChatHomeState extends State<ChatHome> {
     for (final message in _messages) {
       final label = message.isUser ? 'You' : 'AI Assistant';
       final body = message.isPhysicsSample
-          ? 'Step-by-step solution\n\nGiven: u = 20 m/s, g = 9.8 m/s²\nMaximum height: h = u² / (2g) = 400 / 19.6 ≈ 20.41 m\nTime to reach the top: t = u / g = 20 / 9.8 ≈ 2.04 s\nTotal time in air: T = 2t ≈ 4.08 s\n\nFinal answer: maximum height = 20.41 m; total time = 4.08 s.'
+          ? 'Step-by-step solution\n\nGiven: u = 20 m/s, g = 9.8 m/s^2\nMaximum height: h = u^2 / (2g) = 400 / 19.6, approximately 20.41 m\nTime to reach the top: t = u / g = 20 / 9.8, approximately 2.04 s\nTotal time in air: T = 2t = 4.08 s\n\nFinal answer: maximum height = 20.41 m; total time = 4.08 s.'
           : message.isLoading
               ? 'Generating response…'
               : message.text;
