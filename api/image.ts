@@ -39,6 +39,51 @@ export default async function handler(request: Request): Promise<Response> {
       throw new HttpError(503, "Backend setup is incomplete: Cloudflare Workers AI credentials are missing.");
     }
 
+    const db = await getDb();
+    const conversations = db.collection("conversations");
+    const requestedConversationId =
+      typeof body.conversationId === "string" ? body.conversationId : "";
+    if (requestedConversationId && !/^[a-zA-Z0-9_-]{20,80}$/.test(requestedConversationId)) {
+      throw new HttpError(400, "Invalid conversation ID.");
+    }
+
+    let conversationId = requestedConversationId;
+    let conversation = conversationId
+      ? await conversations.findOne({ _id: conversationId, userId })
+      : null;
+
+    if (conversationId && !conversation) {
+      throw new HttpError(404, "Conversation not found. Start a new chat and try again.");
+    }
+
+    const now = new Date();
+    if (!conversation) {
+      conversationId = randomUUID();
+      conversation = {
+        _id: conversationId,
+        userId,
+        title: prompt.length > 80 ? prompt.slice(0, 77) + "..." : prompt,
+        createdAt: now,
+        updatedAt: now,
+        lastMessage: prompt.slice(0, 240),
+      };
+      await conversations.insertOne(conversation);
+    }
+
+    const userMessageId = randomUUID();
+    await db.collection("messages").insertOne({
+      _id: userMessageId,
+      userId,
+      conversationId,
+      role: "user",
+      content: prompt,
+      createdAt: now,
+    });
+    await conversations.updateOne(
+      { _id: conversationId, userId },
+      { $set: { updatedAt: now, lastMessage: prompt.slice(0, 240) } },
+    );
+
     const model = "@cf/black-forest-labs/flux-1-schnell";
     const cfResponse = await fetch(
       "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/" + encodeURIComponent(model),
@@ -79,7 +124,6 @@ export default async function handler(request: Request): Promise<Response> {
       throw new HttpError(502, "The image provider returned an invalid image.");
     }
 
-    const db = await getDb();
     const assetId = randomUUID();
     const key = "generated/" + userId + "/" + assetId + ".jpg";
     let imageUrl: string | null = null;
@@ -132,9 +176,32 @@ export default async function handler(request: Request): Promise<Response> {
       createdAt: new Date(),
     });
 
+    const assistantMessageId = randomUUID();
+    await db.collection("messages").insertOne({
+      _id: assistantMessageId,
+      userId,
+      conversationId,
+      role: "assistant",
+      content: "Generated an image for this prompt.",
+      model,
+      generatedImage: {
+        assetId,
+        imageUrl: storedInR2 ? imageUrl : null,
+        storedInR2,
+        prompt,
+      },
+      createdAt: new Date(),
+    });
+    await conversations.updateOne(
+      { _id: conversationId, userId },
+      { $set: { updatedAt: new Date(), lastMessage: "Generated image: " + prompt.slice(0, 180) } },
+    );
+
     return json(request, {
       ok: true,
       assetId,
+      conversationId,
+      messageId: assistantMessageId,
       prompt,
       model,
       mimeType: "image/jpeg",
