@@ -128,6 +128,7 @@ class ApiStoredMessage {
     this.model,
     this.feedback,
     this.sources = const [],
+    this.generatedImage,
   });
 
   final String id;
@@ -136,6 +137,7 @@ class ApiStoredMessage {
   final String? model;
   final String? feedback;
   final List<Map<String, dynamic>> sources;
+  final GeneratedImage? generatedImage;
 
   factory ApiStoredMessage.fromJson(Map<String, dynamic> json) {
     return ApiStoredMessage(
@@ -150,6 +152,9 @@ class ApiStoredMessage {
               .map((item) => Map<String, dynamic>.from(item))
               .toList()
           : const [],
+      generatedImage: json['generatedImage'] is Map
+          ? GeneratedImage.fromJson(Map<String, dynamic>.from(json['generatedImage'] as Map))
+          : null,
     );
   }
 }
