@@ -283,6 +283,7 @@ class _ChatHomeState extends State<ChatHome> {
           return Scaffold(
             backgroundColor: _canvas,
             body: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(width: 248, child: _sidebar()),
                 Expanded(child: _currentPage()),
@@ -1301,9 +1302,11 @@ class _ChatHomeState extends State<ChatHome> {
                 );
               }
 
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1050),
+              return SizedBox(
+                height: constraints.maxHeight,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1050),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Row(
@@ -1455,9 +1458,11 @@ class _ChatHomeState extends State<ChatHome> {
                 );
               }
 
-              return Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 980),
+              return SizedBox(
+                height: constraints.maxHeight,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 980),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
                     child: Row(
