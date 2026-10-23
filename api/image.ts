@@ -40,7 +40,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const db = await getDb();
-    const conversations = db.collection("conversations");
+    const conversations = db.collection<any>("conversations");
     const requestedConversationId =
       typeof body.conversationId === "string" ? body.conversationId : "";
     if (requestedConversationId && !/^[a-zA-Z0-9_-]{20,80}$/.test(requestedConversationId)) {
@@ -71,7 +71,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const userMessageId = randomUUID();
-    await db.collection("messages").insertOne({
+    await db.collection<any>("messages").insertOne({
       _id: userMessageId,
       userId,
       conversationId,
@@ -86,7 +86,7 @@ export default async function handler(request: Request): Promise<Response> {
 
     const model = "@cf/black-forest-labs/flux-1-schnell";
     const cfResponse = await fetch(
-      "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/" + encodeURIComponent(model),
+      "https://api.cloudflare.com/client/v4/accounts/" + accountId + "/ai/run/" + model.split("/").map(encodeURIComponent).join("/"),
       {
         method: "POST",
         headers: {
@@ -164,7 +164,7 @@ export default async function handler(request: Request): Promise<Response> {
       }
     }
 
-    await db.collection("assets").insertOne({
+    await db.collection<any>("assets").insertOne({
       _id: assetId,
       userId,
       type: "image",
@@ -177,7 +177,7 @@ export default async function handler(request: Request): Promise<Response> {
     });
 
     const assistantMessageId = randomUUID();
-    await db.collection("messages").insertOne({
+    await db.collection<any>("messages").insertOne({
       _id: assistantMessageId,
       userId,
       conversationId,
