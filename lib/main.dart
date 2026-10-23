@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -242,7 +243,7 @@ class _ChatHomeState extends State<ChatHome> {
           margin: const pw.EdgeInsets.only(bottom: 12),
           padding: const pw.EdgeInsets.all(10),
           decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColor.fromHex('#DDE5F2')),
+            border: pw.Border.all(color: pdf.PdfColor.fromHex('#DDE5F2')),
             borderRadius: pw.BorderRadius.circular(8),
           ),
           child: pw.Column(
@@ -560,7 +561,7 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Icon(Icons.bubble_chart_rounded, size: 16, color: _muted),
                     const SizedBox(width: 7),
-                    Text(_model, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    Flexible(child: Text(_model, overflow: TextOverflow.ellipsis, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600))),
                     const SizedBox(width: 5),
                     Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _muted),
                   ],
@@ -568,7 +569,7 @@ class _ChatHomeState extends State<ChatHome> {
               ),
             ),
           const Spacer(),
-          if (_page == 0)
+          if (_page == 0 && MediaQuery.of(context).size.width >= 560)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
               decoration: BoxDecoration(
@@ -1005,7 +1006,8 @@ class _ChatHomeState extends State<ChatHome> {
                         _composerTool(Icons.image_outlined, 'Generate image', () => setState(() => _page = 2)),
                         _composerTool(Icons.travel_explore_rounded, _searchOn ? 'Disable web search' : 'Enable web search', () => setState(() => _searchOn = !_searchOn), active: _searchOn),
                         const SizedBox(width: 5),
-                        PopupMenuButton<String>(
+                        Flexible(
+                          child: PopupMenuButton<String>(
                           tooltip: 'Model selector',
                           onSelected: (value) => setState(() => _model = value),
                           itemBuilder: (context) => const [
@@ -1030,7 +1032,7 @@ class _ChatHomeState extends State<ChatHome> {
                               ],
                             ),
                           ),
-                        ),
+                        )),
                         const Spacer(),
                         Container(
                           width: 34,
