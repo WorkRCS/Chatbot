@@ -515,6 +515,7 @@ class _ChatHomeState extends State<ChatHome> {
           imageMimeType: attachment == null ? null : _mimeTypeForImage(attachment.name),
           model: _model,
           search: _searchOn,
+          thinking: _thinkingOn,
         )) {
           if (!mounted) return;
           if (event.type == 'meta') {
