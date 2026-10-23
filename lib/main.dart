@@ -80,6 +80,8 @@ class ChatMessage {
     this.attachment,
     this.id,
     this.sources = const [],
+    this.generatedImage,
+    this.generatedImageBytes,
   });
 
   final bool isUser;
@@ -90,6 +92,8 @@ class ChatMessage {
   PlatformFile? attachment;
   String? id;
   List<Map<String, dynamic>> sources;
+  GeneratedImage? generatedImage;
+  Uint8List? generatedImageBytes;
 }
 
 class ChatHome extends StatefulWidget {
@@ -250,6 +254,7 @@ class _ChatHomeState extends State<ChatHome> {
                   id: message.id,
                   feedback: message.feedback,
                   sources: message.sources,
+                  generatedImage: message.generatedImage,
                 ))
             .toList();
       });
@@ -274,6 +279,22 @@ class _ChatHomeState extends State<ChatHome> {
     }
   }
 
+  bool _isImageGenerationRequest(String prompt) {
+    final english = RegExp(
+      r'\b(generate|create|draw|make|design|paint|illustrate)\b.{0,100}\b(image|picture|illustration|artwork|logo|wallpaper|poster|portrait|graphic|icon)\b',
+      caseSensitive: false,
+    ).hasMatch(prompt) ||
+        RegExp(r'\b(draw|paint|illustrate)\b.{0,80}\b(cat|dog|landscape|portrait|person|character|dragon|city|scene|building|flower|animal)\b', caseSensitive: false).hasMatch(prompt) ||
+        RegExp(
+          r'\b(image|picture|illustration|artwork|logo|wallpaper|poster)\b.{0,80}\b(of|with|showing)\b',
+          caseSensitive: false,
+        ).hasMatch(prompt);
+    final bengali = RegExp(
+      r'(ছবি|ইমেজ).{0,80}(বানাও|তৈরি|আঁকো|জেনারেট|করো)|(বানাও|তৈরি করো|আঁকো).{0,80}(ছবি|ইমেজ)',
+    ).hasMatch(prompt);
+    return english || bengali;
+  }
+
   String _mimeTypeForImage(String name) {
     final lower = name.toLowerCase();
     if (lower.endsWith('.png')) return 'image/png';
@@ -296,17 +317,19 @@ class _ChatHomeState extends State<ChatHome> {
 
     try {
       if (ApiService.isConfigured) {
-        final generated = await _api.generateImage(prompt);
+        final generated = await _api.generateImage(prompt, conversationId: _activeConversationId);
         final bytes = await _api.downloadGeneratedImage(generated);
         if (!mounted) return;
         setState(() {
           _generatedImage = generated;
+          _activeConversationId = generated.conversationId ?? _activeConversationId;
           _generatedImageBytes = bytes;
           _generatedImageUrl = generated.imageUrl;
           _generatingImage = false;
           _imageReady = true;
         });
         _showInfo('Image generated successfully.');
+        unawaited(_refreshHistory());
       } else {
         await Future<void>.delayed(const Duration(milliseconds: 1100));
         if (!mounted) return;
@@ -378,6 +401,53 @@ class _ChatHomeState extends State<ChatHome> {
       _attachedImage = null;
     });
     _scrollToBottom();
+
+    if (attachment == null && _isImageGenerationRequest(prompt)) {
+      if (!ApiService.isConfigured) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        setState(() {
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..text = 'Image-generation request detected. Configure API_BASE_URL to connect Cloudflare Workers AI.';
+          }
+          _busy = false;
+        });
+        return;
+      }
+
+      try {
+        final generated = await _api.generateImage(prompt, conversationId: _activeConversationId);
+        final bytes = await _api.downloadGeneratedImage(generated);
+        if (!mounted) return;
+        setState(() {
+          _activeConversationId = generated.conversationId ?? _activeConversationId;
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..id = generated.messageId
+              ..text = 'Generated image'
+              ..generatedImage = generated
+              ..generatedImageBytes = bytes;
+          }
+          _busy = false;
+        });
+        unawaited(_refreshHistory());
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            _messages.last
+              ..isLoading = false
+              ..text = 'Image generation failed: ' + error.toString();
+          }
+          _busy = false;
+        });
+      }
+      _scrollToBottom();
+      return;
+    }
 
     if (ApiService.isConfigured) {
       try {
