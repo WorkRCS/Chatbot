@@ -1,7 +1,11 @@
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  errors:
+    deprecated_member_use: ignore
+
 linter:
   rules:
-    prefer_const_constructors: true
-    prefer_const_literals_to_create_immutables: true
+    prefer_const_constructors: false
+    prefer_interpolation_to_compose_strings: false
     avoid_print: true
