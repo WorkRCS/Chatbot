@@ -163,10 +163,27 @@ class _ChatHomeState extends State<ChatHome> {
         _ => 'GPT-OSS 20B',
       };
 
+  String get _modelLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
+        'auto' => 'Auto · Recommended',
+        _ => 'Groq · GPT-OSS 20B',
+      };
+
+  String get _modelShortLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Qwen 3.8',
+        'auto' => 'Auto',
+        _ => 'GPT-OSS 20B',
+      };
+
   @override
   void initState() {
     super.initState();
-    if (ApiService.isConfigured) unawaited(_refreshHistory());
+    if (ApiService.isConfigured) {
+      _messages = [];
+      unawaited(_refreshHistory());
+    }
   }
 
   List<ChatMessage> _sampleMessages() => [
@@ -926,7 +943,6 @@ class _ChatHomeState extends State<ChatHome> {
                 PopupMenuItem(value: 'auto', child: Text('Auto · Recommended')),
                 PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
                 PopupMenuItem(value: 'openai/gpt-oss-120b', child: Text('Groq · GPT-OSS 120B')),
-                PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
                 PopupMenuItem(value: 'qwen/qwen3.8-27b', child: Text('Groq · Qwen 3.8 Vision')),
               ],
               child: Container(
@@ -1585,7 +1601,6 @@ class _ChatHomeState extends State<ChatHome> {
                             PopupMenuItem(value: 'auto', child: Text('Auto · Recommended')),
                             PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
                             PopupMenuItem(value: 'openai/gpt-oss-120b', child: Text('Groq · GPT-OSS 120B')),
-                            PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
                             PopupMenuItem(value: 'qwen/qwen3.8-27b', child: Text('Groq · Qwen 3.8 Vision')),
                           ],
                           child: Container(
