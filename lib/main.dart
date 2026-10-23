@@ -305,7 +305,7 @@ class _ChatHomeState extends State<ChatHome> {
       await FileSaver.instance.saveFile(
         name: 'ai-chat-generated-image',
         bytes: bytes,
-        fileExtension: 'jpg',
+        ext: 'jpg',
         mimeType: MimeType.jpeg,
       );
       _showInfo('Image export started.');
@@ -379,7 +379,7 @@ class _ChatHomeState extends State<ChatHome> {
       await FileSaver.instance.saveFile(
         name: 'ai-chat-generated-image',
         bytes: bytes,
-        fileExtension: 'jpg',
+        ext: 'jpg',
         mimeType: MimeType.jpeg,
       );
       _showInfo('Image export started.');
