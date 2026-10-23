@@ -790,7 +790,7 @@ class _ChatHomeState extends State<ChatHome> {
         ),
         boxShadow: [
           BoxShadow(
-            color: brandBlue.withOpacity(0.18),
+            color: brandBlue.withValues(alpha: 0.18),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -1023,7 +1023,7 @@ class _ChatHomeState extends State<ChatHome> {
                       child: Switch(
                         value: _thinkingOn,
                         onChanged: (value) => setState(() => _thinkingOn = value),
-                        activeColor: brandBlue,
+                        activeThumbColor: brandBlue,
                       ),
                     ),
                   ),
@@ -1085,7 +1085,7 @@ class _ChatHomeState extends State<ChatHome> {
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(colors: [brandBlue, brandPurple]),
                   boxShadow: [
-                    BoxShadow(color: brandBlue.withOpacity(0.22), blurRadius: 24, offset: const Offset(0, 8)),
+                    BoxShadow(color: brandBlue.withValues(alpha: 0.22), blurRadius: 24, offset: const Offset(0, 8)),
                   ],
                 ),
                 child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
@@ -1547,7 +1547,7 @@ class _ChatHomeState extends State<ChatHome> {
       iconSize: 17,
       style: IconButton.styleFrom(
         foregroundColor: active ? brandBlue : _muted,
-        backgroundColor: active ? brandBlue.withOpacity(0.08) : Colors.transparent,
+        backgroundColor: active ? brandBlue.withValues(alpha: 0.08) : Colors.transparent,
       ),
       icon: Icon(icon),
     );
@@ -1573,7 +1573,7 @@ class _ChatHomeState extends State<ChatHome> {
                       ? []
                       : [
                           BoxShadow(
-                            color: const Color(0xFF263B67).withOpacity(0.045),
+                            color: const Color(0xFF263B67).withValues(alpha: 0.045),
                             blurRadius: 20,
                             offset: const Offset(0, 5),
                           ),
@@ -1700,7 +1700,7 @@ class _ChatHomeState extends State<ChatHome> {
       iconSize: 17,
       style: IconButton.styleFrom(
         foregroundColor: active ? brandBlue : _muted,
-        backgroundColor: active ? brandBlue.withOpacity(0.09) : Colors.transparent,
+        backgroundColor: active ? brandBlue.withValues(alpha: 0.09) : Colors.transparent,
         padding: const EdgeInsets.all(8),
       ),
       icon: Icon(icon),
@@ -1876,11 +1876,11 @@ class _ChatHomeState extends State<ChatHome> {
         children: [
           Align(
             alignment: const Alignment(0, -0.05),
-            child: Icon(Icons.landscape_rounded, size: 130, color: Colors.white.withOpacity(0.72)),
+            child: Icon(Icons.landscape_rounded, size: 130, color: Colors.white.withValues(alpha: 0.72)),
           ),
           Align(
             alignment: Alignment.bottomCenter,
-            child: Container(height: 75, color: const Color(0xFF173B51).withOpacity(0.35)),
+            child: Container(height: 75, color: const Color(0xFF173B51).withValues(alpha: 0.35)),
           ),
           const Positioned(
             left: 12,
@@ -2318,7 +2318,7 @@ class _ChatHomeState extends State<ChatHome> {
       child: Row(
         children: [
           Expanded(child: Text(label, style: TextStyle(color: _text, fontSize: 11.5))),
-          Switch.adaptive(value: value, onChanged: onChanged, activeColor: brandBlue),
+          Switch.adaptive(value: value, onChanged: onChanged, activeThumbColor: brandBlue),
         ],
       ),
     );
