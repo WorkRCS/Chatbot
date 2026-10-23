@@ -27,7 +27,7 @@ export async function searchWeb(query: string): Promise<SearchSource[]> {
       include_answer: false,
       include_raw_content: false,
     }),
-    signal: AbortSignal.timeout(12_000),
+    signal: AbortSignal.timeout(7_000),
   });
 
   if (!response.ok) {
