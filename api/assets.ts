@@ -57,7 +57,7 @@ export default async function handler(request: Request): Promise<Response> {
       ok: true,
       assetId,
       url,
-      mimeType: "image/jpeg",
+      mimeType: typeof asset.mimeType === "string" ? asset.mimeType : "image/jpeg",
       expiresIn: 600,
     });
   } catch (error) {
