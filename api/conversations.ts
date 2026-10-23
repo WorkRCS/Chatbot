@@ -41,6 +41,7 @@ export default async function handler(request: Request): Promise<Response> {
           feedback: message.feedback || null,
           sources: message.sources || [],
           attachment: message.attachment || null,
+          generatedImage: message.generatedImage || null,
           createdAt: message.createdAt,
         })),
       });
