@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 const String _configuredBaseUrl = String.fromEnvironment(
   'API_BASE_URL',
@@ -171,7 +170,6 @@ class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
-  static const Uuid _uuid = Uuid();
 
   static bool get isConfigured => _configuredBaseUrl.trim().isNotEmpty;
 
