@@ -1,6 +1,14 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:file_saver/file_saver.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'api_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
@@ -70,6 +78,8 @@ class ChatMessage {
     this.isLoading = false,
     this.feedback,
     this.attachment,
+    this.id,
+    this.sources = const [],
   });
 
   final bool isUser;
@@ -78,6 +88,8 @@ class ChatMessage {
   bool isLoading;
   String? feedback;
   PlatformFile? attachment;
+  String? id;
+  List<Map<String, dynamic>> sources;
 }
 
 class ChatHome extends StatefulWidget {
@@ -96,13 +108,20 @@ class ChatHome extends StatefulWidget {
 
 class _ChatHomeState extends State<ChatHome> {
   int _page = 0;
-  String _model = 'Groq · Llama 3.1 70B';
+  String _model = 'openai/gpt-oss-20b';
   bool _searchOn = false;
   bool _thinkingOn = true;
   bool _generatingImage = false;
   bool _imageReady = true;
   bool _busy = false;
+  String? _activeConversationId;
+  bool _historyLoading = false;
   String _chatSearchQuery = '';
+  Uint8List? _generatedImageBytes;
+  String? _generatedImageUrl;
+  GeneratedImage? _generatedImage;
+  final ApiService _api = ApiService();
+  List<ApiConversation> _savedConversations = [];
   PlatformFile? _attachedImage;
   final TextEditingController _composer = TextEditingController();
   final TextEditingController _imagePrompt = TextEditingController(
@@ -110,7 +129,7 @@ class _ChatHomeState extends State<ChatHome> {
   );
   final ScrollController _messageScroll = ScrollController();
 
-  final List<String> _recentChats = [
+  List<String> _recentChats = [
     'Solve this physics problem',
     'Create a beautiful landscape',
     'What is machine learning?',
@@ -126,6 +145,26 @@ class _ChatHomeState extends State<ChatHome> {
   Color get _muted => widget.dark ? const Color(0xFF91A0B8) : const Color(0xFF71809A);
   Color get _line => widget.dark ? const Color(0xFF253248) : lineLight;
 
+  String get _modelLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
+        'auto' => 'Auto · Recommended',
+        _ => 'Groq · GPT-OSS 20B',
+      };
+
+  String get _modelShortLabel => switch (_model) {
+        'openai/gpt-oss-120b' => 'GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Qwen 3.8',
+        'auto' => 'Auto',
+        _ => 'GPT-OSS 20B',
+      };
+
+  @override
+  void initState() {
+    super.initState();
+    if (ApiService.isConfigured) unawaited(_refreshHistory());
+  }
+
   List<ChatMessage> _sampleMessages() => [
         ChatMessage(
           isUser: true,
@@ -137,6 +176,7 @@ class _ChatHomeState extends State<ChatHome> {
 
   @override
   void dispose() {
+    _api.dispose();
     _composer.dispose();
     _imagePrompt.dispose();
     _messageScroll.dispose();
@@ -147,6 +187,7 @@ class _ChatHomeState extends State<ChatHome> {
     setState(() {
       _page = 0;
       _messages = [];
+      _activeConversationId = null;
       _busy = false;
       _attachedImage = null;
       _composer.clear();
@@ -154,19 +195,68 @@ class _ChatHomeState extends State<ChatHome> {
   }
 
   void _openRecent(String title) {
+    final matches = _savedConversations.where((item) => item.title == title);
+    if (matches.isNotEmpty) {
+      unawaited(_loadSavedConversation(matches.first));
+      return;
+    }
     setState(() {
       _page = 0;
+      _activeConversationId = null;
       _messages = title == 'Solve this physics problem'
           ? _sampleMessages()
           : [
               ChatMessage(isUser: true, text: title),
               ChatMessage(
                 isUser: false,
-                text:
-                    'This is a preview conversation. Once the backend is connected, this chat will load its saved messages from the database.',
+                text: 'This is a local sample conversation. Connect the backend to load saved messages.',
               ),
             ];
     });
+  }
+
+  Future<void> _refreshHistory() async {
+    if (!ApiService.isConfigured || _historyLoading) return;
+    _historyLoading = true;
+    try {
+      final items = await _api.listConversations();
+      if (!mounted) return;
+      setState(() {
+        _savedConversations = items;
+        final savedTitles = items.map((item) => item.title).toList();
+        _recentChats = [
+          ...savedTitles,
+          ..._recentChats.where((title) => !savedTitles.contains(title)),
+        ].take(40).toList();
+      });
+    } catch (_) {
+      // Keep local sample history visible when the backend is not ready.
+    } finally {
+      _historyLoading = false;
+    }
+  }
+
+  Future<void> _loadSavedConversation(ApiConversation conversation) async {
+    try {
+      final history = await _api.getMessages(conversation.id);
+      if (!mounted) return;
+      setState(() {
+        _activeConversationId = conversation.id;
+        _page = 0;
+        _messages = history
+            .map((message) => ChatMessage(
+                  isUser: message.role == 'user',
+                  text: message.content,
+                  id: message.id,
+                  feedback: message.feedback,
+                  sources: message.sources,
+                ))
+            .toList();
+      });
+      _scrollToBottom();
+    } catch (error) {
+      _showInfo(error.toString());
+    }
   }
 
   Future<void> _pickImage() async {
@@ -572,11 +662,11 @@ class _ChatHomeState extends State<ChatHome> {
               initialValue: _model,
               onSelected: (value) => setState(() => _model = value),
               itemBuilder: (context) => const [
-                PopupMenuItem(value: 'Auto · Recommended', child: Text('Auto · Recommended')),
-                PopupMenuItem(value: 'Groq · Llama 3.1 70B', child: Text('Groq · Llama 3.1 70B')),
-                PopupMenuItem(value: 'Groq · GPT-OSS 120B', child: Text('Groq · GPT-OSS 120B')),
-                PopupMenuItem(value: 'Groq · GPT-OSS 20B', child: Text('Groq · GPT-OSS 20B')),
-                PopupMenuItem(value: 'Groq · Qwen Vision', child: Text('Groq · Qwen Vision')),
+                PopupMenuItem(value: 'auto', child: Text('Auto · Recommended')),
+                PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
+                PopupMenuItem(value: 'openai/gpt-oss-120b', child: Text('Groq · GPT-OSS 120B')),
+                PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
+                PopupMenuItem(value: 'qwen/qwen3.8-27b', child: Text('Groq · Qwen 3.8 Vision')),
               ],
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
@@ -589,7 +679,7 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Icon(Icons.bubble_chart_rounded, size: 16, color: _muted),
                     const SizedBox(width: 7),
-                    Text(_model, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                    Text(_modelLabel, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600)),
                     const SizedBox(width: 5),
                     Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _muted),
                   ],
@@ -1092,11 +1182,11 @@ class _ChatHomeState extends State<ChatHome> {
                           tooltip: 'Model selector',
                           onSelected: (value) => setState(() => _model = value),
                           itemBuilder: (context) => const [
-                            PopupMenuItem(value: 'Auto · Recommended', child: Text('Auto · Recommended')),
-                            PopupMenuItem(value: 'Groq · Llama 3.1 70B', child: Text('Groq · Llama 3.1 70B')),
-                            PopupMenuItem(value: 'Groq · GPT-OSS 120B', child: Text('Groq · GPT-OSS 120B')),
-                            PopupMenuItem(value: 'Groq · GPT-OSS 20B', child: Text('Groq · GPT-OSS 20B')),
-                            PopupMenuItem(value: 'Groq · Qwen Vision', child: Text('Groq · Qwen Vision')),
+                            PopupMenuItem(value: 'auto', child: Text('Auto · Recommended')),
+                            PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
+                            PopupMenuItem(value: 'openai/gpt-oss-120b', child: Text('Groq · GPT-OSS 120B')),
+                            PopupMenuItem(value: 'openai/gpt-oss-20b', child: Text('Groq · GPT-OSS 20B')),
+                            PopupMenuItem(value: 'qwen/qwen3.8-27b', child: Text('Groq · Qwen 3.8 Vision')),
                           ],
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -1108,7 +1198,7 @@ class _ChatHomeState extends State<ChatHome> {
                               children: [
                                 Icon(Icons.bubble_chart_rounded, color: _muted, size: 14),
                                 const SizedBox(width: 5),
-                                Flexible(child: Text(_model.replaceFirst('Groq · ', ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted))),
+                                Flexible(child: Flexible(child: Text(_modelShortLabel, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted)))),
                                 Icon(Icons.keyboard_arrow_down_rounded, color: _muted, size: 14),
                               ],
                             ),
