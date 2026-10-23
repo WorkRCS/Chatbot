@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
@@ -68,6 +69,7 @@ class ChatMessage {
     this.isPhysicsSample = false,
     this.isLoading = false,
     this.feedback,
+    this.attachment,
   });
 
   final bool isUser;
@@ -75,6 +77,7 @@ class ChatMessage {
   final bool isPhysicsSample;
   bool isLoading;
   String? feedback;
+  PlatformFile? attachment;
 }
 
 class ChatHome extends StatefulWidget {
@@ -100,6 +103,7 @@ class _ChatHomeState extends State<ChatHome> {
   bool _generatingImage = false;
   bool _imageReady = true;
   bool _busy = false;
+  PlatformFile? _attachedImage;
   final TextEditingController _composer = TextEditingController();
   final TextEditingController _imagePrompt = TextEditingController(
     text: 'A beautiful mountain landscape with a lake, sunrise, and snow-capped peaks',
@@ -145,6 +149,7 @@ class _ChatHomeState extends State<ChatHome> {
       _chatTitle = 'New conversation';
       _messages = [];
       _busy = false;
+      _attachedImage = null;
       _composer.clear();
     });
   }
@@ -166,9 +171,26 @@ class _ChatHomeState extends State<ChatHome> {
     });
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+        withData: true,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+      setState(() => _attachedImage = result.files.single);
+      _showInfo('Image attached for frontend preview. Backend vision is not connected yet.');
+    } catch (error) {
+      _showInfo('Could not open the image picker on this platform.');
+    }
+  }
+
   Future<void> _sendMessage() async {
-    final prompt = _composer.text.trim();
-    if (prompt.isEmpty || _busy) return;
+    final rawPrompt = _composer.text.trim();
+    if ((rawPrompt.isEmpty && _attachedImage == null) || _busy) return;
+    final prompt = rawPrompt.isEmpty ? 'Please analyze the attached image.' : rawPrompt;
+    final attachment = _attachedImage;
 
     setState(() {
       _page = 0;
@@ -176,9 +198,10 @@ class _ChatHomeState extends State<ChatHome> {
       _chatTitle = prompt.length > 32
           ? prompt.substring(0, 32) + '…'
           : prompt;
-      _messages.add(ChatMessage(isUser: true, text: prompt));
+      _messages.add(ChatMessage(isUser: true, text: prompt, attachment: attachment));
       _messages.add(ChatMessage(isUser: false, isLoading: true));
       _composer.clear();
+      _attachedImage = null;
     });
     _scrollToBottom();
 
@@ -729,7 +752,30 @@ class _ChatHomeState extends State<ChatHome> {
               bottomRight: Radius.circular(5),
             ),
           ),
-          child: SelectableText(message.text, style: TextStyle(color: _text, fontSize: 13, height: 1.55)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (message.attachment?.bytes != null)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: Image.memory(
+                    message.attachment!.bytes!,
+                    width: 230,
+                    height: 145,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              if (message.attachment != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 7, bottom: 4),
+                  child: Text(
+                    message.attachment!.name,
+                    style: TextStyle(color: _muted, fontSize: 10),
+                  ),
+                ),
+              SelectableText(message.text, style: TextStyle(color: _text, fontSize: 13, height: 1.55)),
+            ],
+          ),
         ),
       );
     }
@@ -987,6 +1033,36 @@ class _ChatHomeState extends State<ChatHome> {
                 ),
                 child: Column(
                   children: [
+                    if (_attachedImage != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 9),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: widget.dark ? const Color(0xFF17243A) : const Color(0xFFF3F6FD),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: _line),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.image_outlined, color: brandBlue, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _attachedImage!.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: _text, fontSize: 10.5),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Remove image',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => setState(() => _attachedImage = null),
+                              icon: Icon(Icons.close_rounded, size: 16, color: _muted),
+                            ),
+                          ],
+                        ),
+                      ),
                     TextField(
                       controller: _composer,
                       minLines: 1,
@@ -1003,7 +1079,7 @@ class _ChatHomeState extends State<ChatHome> {
                     ),
                     Row(
                       children: [
-                        _composerTool(Icons.attach_file_rounded, 'Attach image', () => _showInfo('Image upload UI is ready; file upload will be connected in the backend phase.')),
+                        _composerTool(Icons.attach_file_rounded, 'Attach image', _pickImage),
                         _composerTool(Icons.image_outlined, 'Generate image', () => setState(() => _page = 2)),
                         _composerTool(Icons.travel_explore_rounded, _searchOn ? 'Disable web search' : 'Enable web search', () => setState(() => _searchOn = !_searchOn), active: _searchOn),
                         const SizedBox(width: 5),
