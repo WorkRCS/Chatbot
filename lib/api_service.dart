@@ -67,6 +67,7 @@ class GeneratedImage {
     this.imageUrl,
     this.conversationId,
     this.messageId,
+    this.storedInR2 = false,
   });
 
   final String assetId;
@@ -76,6 +77,7 @@ class GeneratedImage {
   final String? imageUrl;
   final String? conversationId;
   final String? messageId;
+  final bool storedInR2;
 
   Uint8List? get bytes {
     final value = dataUrl;
@@ -96,6 +98,7 @@ class GeneratedImage {
       imageUrl: json['imageUrl'] as String?,
       conversationId: json['conversationId'] as String?,
       messageId: json['messageId'] as String?,
+      storedInR2: json['storedInR2'] as bool? ?? false,
     );
   }
 }
@@ -365,9 +368,19 @@ class ApiService {
   Future<Uint8List> downloadGeneratedImage(GeneratedImage image) async {
     final data = image.bytes;
     if (data != null) return data;
-    final url = image.imageUrl;
+
+    String? url = image.imageUrl;
+    if (image.storedInR2 && image.assetId.isNotEmpty && isConfigured) {
+      final refreshed = await _requestJson(
+        '/api/assets?id=' + Uri.encodeQueryComponent(image.assetId),
+      );
+      url = refreshed['url'] as String?;
+    }
+
     if (url == null || url.isEmpty) {
-      throw ChatApiException('The generated image is not available to download.');
+      throw ChatApiException(
+        'The image is not available. Configure Cloudflare R2 to keep generated images across sessions.',
+      );
     }
 
     final response = await _client
