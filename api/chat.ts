@@ -14,6 +14,7 @@ import { searchWeb, shouldSearch, type SearchSource } from "../server/search";
 
 type ChatRole = "user" | "assistant";
 type StoredMessage = {
+  interrupted?: boolean;
   _id: string;
   userId: string;
   conversationId: string;
@@ -123,8 +124,8 @@ async function refreshConversationSummary(
   userId: string,
   conversationId: string,
 ): Promise<void> {
-  const conversations = db.collection("conversations");
-  const messages = db.collection("messages");
+  const conversations = db.collection<any>("conversations");
+  const messages = db.collection<any>("messages");
   const conversation = await conversations.findOne({ _id: conversationId, userId });
   if (!conversation) return;
 
@@ -246,7 +247,7 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const db = await getDb();
-    const conversations = db.collection("conversations");
+    const conversations = db.collection<any>("conversations");
     const messagesCollection = db.collection<StoredMessage>("messages");
     let conversationId = requestedConversationId;
     let conversation = conversationId
