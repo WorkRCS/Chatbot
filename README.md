@@ -23,6 +23,7 @@ For Android, connect a device or start an emulator, then run `flutter run`. You 
 - Desktop: navigation sidebar, centered chat canvas, and an image-generation side panel.
 - Tablet/mobile: adaptive navigation drawer and stacked image/PDF layouts.
 - Transparent assistant responses, sample physics formatting, loading skeleton, model switcher, feedback controls, and PDF export.
+- Local image picker with an attachment preview in the chat composer.
 - Image-generation UI with a local preview state.
 - Light/dark theme and recent-chat navigation.
 - Uses local mock data until backend integration is approved.
