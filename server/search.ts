@@ -6,7 +6,7 @@ export type SearchSource = {
 };
 
 export function shouldSearch(prompt: string): boolean {
-  return /\b(latest|today|current|currently|recent|news|right now|this week|this month|as of|source|sources|citation|citations|fact.?check|verify|look up|search the web|web search|who is the current|price today|weather today)\b/i.test(prompt);
+  return /\b(latest|today|current|currently|recent|news|right now|this week|this month|as of|source|sources|citation|citations|fact.?check|verify|look up|search the web|web search|who is the current|price today|weather today|breaking|latest version)\b/i.test(prompt) || /(আজ|এখন|বর্তমান|সাম্প্রতিক|খবর|যাচাই|সোর্স|তথ্যসূত্র|আজকের|সর্বশেষ)/i.test(prompt);
 }
 
 export async function searchWeb(query: string): Promise<SearchSource[]> {
