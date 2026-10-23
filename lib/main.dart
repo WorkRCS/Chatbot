@@ -97,12 +97,12 @@ class ChatHome extends StatefulWidget {
 class _ChatHomeState extends State<ChatHome> {
   int _page = 0;
   String _model = 'Groq · Llama 3.1 70B';
-  String _chatTitle = 'Solve this physics problem';
   bool _searchOn = false;
   bool _thinkingOn = true;
   bool _generatingImage = false;
   bool _imageReady = true;
   bool _busy = false;
+  String _chatSearchQuery = '';
   PlatformFile? _attachedImage;
   final TextEditingController _composer = TextEditingController();
   final TextEditingController _imagePrompt = TextEditingController(
@@ -146,7 +146,6 @@ class _ChatHomeState extends State<ChatHome> {
   void _startNewChat() {
     setState(() {
       _page = 0;
-      _chatTitle = 'New conversation';
       _messages = [];
       _busy = false;
       _attachedImage = null;
@@ -157,7 +156,6 @@ class _ChatHomeState extends State<ChatHome> {
   void _openRecent(String title) {
     setState(() {
       _page = 0;
-      _chatTitle = title;
       _messages = title == 'Solve this physics problem'
           ? _sampleMessages()
           : [
@@ -181,7 +179,7 @@ class _ChatHomeState extends State<ChatHome> {
       if (!mounted || result == null || result.files.isEmpty) return;
       setState(() => _attachedImage = result.files.single);
       _showInfo('Image attached for frontend preview. Backend vision is not connected yet.');
-    } catch (error) {
+    } catch (_) {
       _showInfo('Could not open the image picker on this platform.');
     }
   }
@@ -195,9 +193,6 @@ class _ChatHomeState extends State<ChatHome> {
     setState(() {
       _page = 0;
       _busy = true;
-      _chatTitle = prompt.length > 32
-          ? prompt.substring(0, 32) + '…'
-          : prompt;
       _messages.add(ChatMessage(isUser: true, text: prompt, attachment: attachment));
       _messages.add(ChatMessage(isUser: false, isLoading: true));
       _composer.clear();
@@ -1470,7 +1465,7 @@ class _ChatHomeState extends State<ChatHome> {
                     Text('Find a past question or return to an earlier topic.', style: TextStyle(color: _muted, fontSize: 12)),
                     const SizedBox(height: 22),
                     TextField(
-                      onChanged: (value) => setState(() {}),
+                      onChanged: (value) => setState(() => _chatSearchQuery = value),
                       decoration: InputDecoration(
                         hintText: 'Search chats…',
                         prefixIcon: const Icon(Icons.search_rounded),
@@ -1483,7 +1478,7 @@ class _ChatHomeState extends State<ChatHome> {
                     const SizedBox(height: 18),
                     Expanded(
                       child: ListView(
-                        children: _recentChats.map((title) {
+                        children: _recentChats.where((title) => title.toLowerCase().contains(_chatSearchQuery.toLowerCase())).map((title) {
                           return Card(
                             elevation: 0,
                             color: _surface,
