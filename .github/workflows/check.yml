@@ -1,0 +1,41 @@
+name: Project checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install backend dependencies
+        run: npm install
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+  flutter-analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate platform scaffolding
+        run: flutter create . --platforms=android,ios,web
+      - name: Install Flutter packages
+        run: flutter pub get
+      - name: Analyze Flutter app
+        run: flutter analyze
