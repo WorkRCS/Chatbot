@@ -561,7 +561,7 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Icon(Icons.bubble_chart_rounded, size: 16, color: _muted),
                     const SizedBox(width: 7),
-                    Flexible(child: Text(_model, overflow: TextOverflow.ellipsis, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600))),
+                    Text(_model, style: TextStyle(color: _text, fontSize: 11.5, fontWeight: FontWeight.w600)),
                     const SizedBox(width: 5),
                     Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: _muted),
                   ],
@@ -1027,7 +1027,7 @@ class _ChatHomeState extends State<ChatHome> {
                               children: [
                                 Icon(Icons.bubble_chart_rounded, color: _muted, size: 14),
                                 const SizedBox(width: 5),
-                                Text(_model.replaceFirst('Groq · ', ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted)),
+                                Flexible(child: Text(_model.replaceFirst('Groq · ', ''), overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _muted))),
                                 Icon(Icons.keyboard_arrow_down_rounded, color: _muted, size: 14),
                               ],
                             ),
