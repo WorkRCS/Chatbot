@@ -12,6 +12,13 @@ dependencies:
   cupertino_icons: ^1.0.8
   google_fonts: ^6.2.1
   file_picker: ^8.1.7
+  url_launcher: ^6.3.1
+  flutter_math_fork: ^0.7.4
+  flutter_markdown: ^0.7.4+3
+  file_saver: ^0.2.14
+  uuid: ^4.5.1
+  shared_preferences: ^2.3.3
+  http: ^1.2.2
   pdf: ^3.11.3
   printing: ^5.14.2
 
