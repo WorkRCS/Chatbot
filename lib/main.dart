@@ -257,6 +257,7 @@ class _ChatHomeState extends State<ChatHome> {
                   id: message.id,
                   feedback: message.feedback,
                   sources: message.sources,
+                  generatedImage: message.generatedImage,
                 ))
             .toList();
       });
@@ -286,6 +287,7 @@ class _ChatHomeState extends State<ChatHome> {
       r'\b(generate|create|draw|make|design|paint|illustrate)\b.{0,100}\b(image|picture|illustration|artwork|logo|wallpaper|poster|portrait|graphic|icon)\b',
       caseSensitive: false,
     ).hasMatch(prompt) ||
+        RegExp(r'\b(draw|paint|illustrate)\b.{0,80}\b(cat|dog|landscape|portrait|person|character|dragon|city|scene|building|flower|animal)\b', caseSensitive: false).hasMatch(prompt) ||
         RegExp(
           r'\b(image|picture|illustration|artwork|logo|wallpaper|poster)\b.{0,80}\b(of|with|showing)\b',
           caseSensitive: false,
