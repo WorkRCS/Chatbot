@@ -78,6 +78,7 @@ class ChatMessage {
     this.feedback,
     this.attachment,
     this.id,
+    this.model,
     this.sources = const [],
     this.generatedImage,
     this.generatedImageBytes,
@@ -92,6 +93,7 @@ class ChatMessage {
   String? feedback;
   PlatformFile? attachment;
   String? id;
+  String? model;
   List<Map<String, dynamic>> sources;
   GeneratedImage? generatedImage;
   Uint8List? generatedImageBytes;
@@ -157,6 +159,14 @@ class _ChatHomeState extends State<ChatHome> {
         'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
         'auto' => 'Auto · Recommended',
         _ => 'Groq · GPT-OSS 20B',
+      };
+
+  String _labelForModel(String model) => switch (model) {
+        'openai/gpt-oss-120b' => 'Groq · GPT-OSS 120B',
+        'qwen/qwen3.8-27b' => 'Groq · Qwen 3.8 Vision',
+        'openai/gpt-oss-20b' => 'Groq · GPT-OSS 20B',
+        '@cf/meta/llama-3.2-11b-vision-instruct' => 'Cloudflare · Llama Vision',
+        _ => _modelLabel,
       };
 
   String get _modelShortLabel => switch (_model) {
@@ -258,6 +268,7 @@ class _ChatHomeState extends State<ChatHome> {
                   isUser: message.role == 'user',
                   text: message.content,
                   id: message.id,
+                  model: message.model,
                   feedback: message.feedback,
                   sources: message.sources,
                   generatedImage: message.generatedImage,
@@ -541,6 +552,7 @@ class _ChatHomeState extends State<ChatHome> {
               if (_messages.isNotEmpty && !_messages.last.isUser) {
                 _messages.last
                   ..id = event.messageId
+                  ..model = event.model
                   ..sources = event.sources;
               }
             });
@@ -571,7 +583,8 @@ class _ChatHomeState extends State<ChatHome> {
               if (_messages.isNotEmpty && !_messages.last.isUser) {
                 _messages.last
                   ..isLoading = false
-                  ..id = event.messageId ?? _messages.last.id;
+                  ..id = event.messageId ?? _messages.last.id
+                  ..model = event.model ?? _messages.last.model;
               }
               _busy = false;
             });
@@ -1237,7 +1250,7 @@ class _ChatHomeState extends State<ChatHome> {
                   children: [
                     Text('AI Assistant', style: TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w800)),
                     const SizedBox(width: 8),
-                    Text(_modelLabel, style: TextStyle(color: _muted, fontSize: 10)),
+                    Text(_labelForModel(message.model ?? _model), style: TextStyle(color: _muted, fontSize: 10)),
                     const Spacer(),
                     Icon(Icons.more_horiz_rounded, size: 18, color: _muted),
                   ],
