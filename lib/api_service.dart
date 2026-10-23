@@ -182,14 +182,6 @@ class ApiService {
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
-  Future<String> _getGuestId(SharedPreferences prefs) async {
-    final existing = prefs.getString('ai_chat_guest_id');
-    if (existing != null && existing.isNotEmpty) return existing;
-    final id = _uuid.v4();
-    await prefs.setString('ai_chat_guest_id', id);
-    return id;
-  }
-
   Future<String> _getSessionToken() async {
     if (!isConfigured) {
       throw ChatApiException(
@@ -203,23 +195,31 @@ class ApiService {
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     if (existingToken != null && expiresAt > now + 60) return existingToken;
 
-    final guestId = await _getGuestId(prefs);
+    final refreshToken = prefs.getString('ai_chat_refresh_token');
     final response = await _client
         .post(
           _uri('/api/session'),
           headers: const {'Content-Type': 'application/json'},
-          body: jsonEncode({'guestId': guestId}),
+          body: jsonEncode({
+            if (refreshToken != null && refreshToken.isNotEmpty)
+              'refreshToken': refreshToken,
+          }),
         )
         .timeout(const Duration(seconds: 15));
 
     final data = _decodeJsonResponse(response);
     final token = data['token'];
     final exp = data['expiresAt'];
-    if (token is! String || exp is! num) {
+    final newRefreshToken = data['refreshToken'];
+    final guestId = data['guestId'];
+    if (token is! String || exp is! num ||
+        newRefreshToken is! String || guestId is! String) {
       throw ChatApiException('Could not start a guest session.');
     }
     await prefs.setString('ai_chat_session_token', token);
     await prefs.setInt('ai_chat_session_expires_at', exp.toInt());
+    await prefs.setString('ai_chat_refresh_token', newRefreshToken);
+    await prefs.setString('ai_chat_guest_id', guestId);
     return token;
   }
 
