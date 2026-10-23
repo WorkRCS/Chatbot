@@ -371,6 +371,26 @@ class _ChatHomeState extends State<ChatHome> {
     }
   }
 
+  Future<void> _downloadMessageImage(ChatMessage message) async {
+    try {
+      final generated = message.generatedImage;
+      if (generated == null) {
+        _showInfo('The generated image is not available to download.');
+        return;
+      }
+      final bytes = message.generatedImageBytes ?? await _api.downloadGeneratedImage(generated);
+      await FileSaver.instance.saveFile(
+        name: 'ai-chat-generated-image',
+        bytes: bytes,
+        ext: 'jpg',
+        mimeType: MimeType.jpeg,
+      );
+      _showInfo('Image export started.');
+    } catch (error) {
+      _showInfo('Could not download image: ' + error.toString());
+    }
+  }
+
   void _setFeedback(ChatMessage message, String reaction) {
     final next = message.feedback == reaction ? null : reaction;
     setState(() => message.feedback = next);
@@ -1170,6 +1190,54 @@ class _ChatHomeState extends State<ChatHome> {
                 ),
                 const SizedBox(height: 14),
                 if (message.isPhysicsSample) _physicsAnswer() else _plainAnswer(message.text),
+                if (message.generatedImageBytes != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.memory(
+                      message.generatedImageBytes!,
+                      width: 420,
+                      height: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                    ),
+                  ),
+                ] else if (message.generatedImage?.imageUrl != null) ...[
+                  const SizedBox(height: 12),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      message.generatedImage!.imageUrl!,
+                      width: 420,
+                      height: 300,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                    ),
+                  ),
+                ],
+                if (message.sources.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    children: message.sources.map((source) {
+                      final title = source['title'] as String? ?? 'Source';
+                      final url = source['url'] as String? ?? '';
+                      return ActionChip(
+                        avatar: const Icon(Icons.open_in_new_rounded, size: 13, color: brandBlue),
+                        label: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10, color: _text)),
+                        backgroundColor: _surface,
+                        side: BorderSide(color: _line),
+                        onPressed: () {
+                          final target = Uri.tryParse(url);
+                          if (target != null && (target.scheme == 'http' || target.scheme == 'https')) {
+                            unawaited(launchUrl(target, mode: LaunchMode.externalApplication));
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
                 const SizedBox(height: 13),
                 Wrap(
                   spacing: 2,
@@ -1184,15 +1252,17 @@ class _ChatHomeState extends State<ChatHome> {
                     _messageAction(
                       message.feedback == 'like' ? Icons.thumb_up : Icons.thumb_up_outlined,
                       'Like',
-                      () => setState(() => message.feedback = message.feedback == 'like' ? null : 'like'),
+                      () => _setFeedback(message, 'like'),
                       active: message.feedback == 'like',
                     ),
                     _messageAction(
                       message.feedback == 'dislike' ? Icons.thumb_down : Icons.thumb_down_outlined,
                       'Dislike',
-                      () => setState(() => message.feedback = message.feedback == 'dislike' ? null : 'dislike'),
+                      () => _setFeedback(message, 'dislike'),
                       active: message.feedback == 'dislike',
                     ),
+                    if (message.generatedImage != null)
+                      _messageAction(Icons.download_rounded, 'Download image', () => _downloadMessageImage(message)),
                     _messageAction(Icons.picture_as_pdf_outlined, 'Download PDF', _exportPdf),
                   ],
                 ),
@@ -1322,9 +1392,98 @@ class _ChatHomeState extends State<ChatHome> {
     );
   }
 
-  Widget _plainAnswer(String text) {
-    return SelectableText(text, style: TextStyle(fontSize: 13, height: 1.7, color: _text));
+  Widget _plainAnswer(String text) => _formattedAnswer(text);
+
+  Widget _formattedAnswer(String content) {
+    final equationPattern = RegExp(
+      r'(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+\$)',
+    );
+    final matches = equationPattern.allMatches(content).toList();
+    if (matches.isEmpty) return _markdownBlock(content);
+
+    final children = <Widget>[];
+    var offset = 0;
+    for (final match in matches) {
+      if (match.start > offset) {
+        children.add(_markdownBlock(content.substring(offset, match.start)));
+      }
+
+      final token = match.group(0) ?? '';
+      final isDisplay = token.startsWith(r'$$') || token.startsWith(r'\[');
+      var expression = token;
+      if (token.startsWith(r'$$')) {
+        expression = token.substring(2, token.length - 2);
+      } else if (token.startsWith(r'\[') || token.startsWith(r'\(')) {
+        expression = token.substring(2, token.length - 2);
+      } else if (token.startsWith(r'$')) {
+        expression = token.substring(1, token.length - 1);
+      }
+
+      try {
+        final mathWidget = Math.tex(
+          expression,
+          mathStyle: isDisplay ? MathStyle.display : MathStyle.text,
+          textStyle: TextStyle(fontSize: 14, color: _text),
+        );
+        children.add(
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: isDisplay ? 8 : 2),
+            child: isDisplay
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: mathWidget,
+                  )
+                : Align(alignment: Alignment.centerLeft, child: mathWidget),
+          ),
+        );
+      } catch (_) {
+        children.add(SelectableText(token, style: TextStyle(color: _text, fontSize: 13)));
+      }
+      offset = match.end;
+    }
+
+    if (offset < content.length) {
+      children.add(_markdownBlock(content.substring(offset)));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
   }
+
+  Widget _markdownBlock(String data) {
+    if (data.trim().isEmpty) return const SizedBox(height: 5);
+    final base = MarkdownStyleSheet.fromTheme(Theme.of(context));
+    return MarkdownBody(
+      data: data,
+      selectable: true,
+      styleSheet: base.copyWith(
+        p: TextStyle(color: _text, fontSize: 13, height: 1.7),
+        h1: TextStyle(color: _text, fontSize: 21, fontWeight: FontWeight.w800),
+        h2: TextStyle(color: _text, fontSize: 18, fontWeight: FontWeight.w800),
+        h3: TextStyle(color: _text, fontSize: 15, fontWeight: FontWeight.w800),
+        strong: TextStyle(color: _text, fontWeight: FontWeight.w800),
+        em: TextStyle(color: _text, fontStyle: FontStyle.italic),
+        a: const TextStyle(color: brandBlue, decoration: TextDecoration.underline),
+        code: TextStyle(
+          color: _text,
+          fontFamily: 'monospace',
+          fontSize: 12,
+          backgroundColor: widget.dark ? const Color(0xFF202C42) : const Color(0xFFF0F3F9),
+        ),
+      ),
+      onTapLink: (text, href, title) {
+        if (href == null) return;
+        final target = Uri.tryParse(href);
+        if (target != null && (target.scheme == 'http' || target.scheme == 'https')) {
+          unawaited(launchUrl(target, mode: LaunchMode.externalApplication));
+        }
+      },
+    );
+  }
+
 
   Widget _messageAction(IconData icon, String tooltip, VoidCallback onTap, {bool active = false}) {
     return IconButton(
