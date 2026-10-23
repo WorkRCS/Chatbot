@@ -98,7 +98,7 @@ async function startGroqStream(
             ? (thinking ? "high" : "none")
             : (thinking ? "medium" : "low"),
         }),
-        signal: AbortSignal.timeout(22_000),
+        signal: AbortSignal.timeout(10_000),
       });
     } catch {
       lastStatus = 0;
