@@ -47,9 +47,20 @@ function sseEvent(data: unknown): Uint8Array {
   return new TextEncoder().encode("data: " + JSON.stringify(data) + "\n\n");
 }
 
-function selectModels(requested: string, hasImage: boolean): string[] {
+function selectModels(requested: string, hasImage: boolean, prompt: string): string[] {
   if (hasImage) return ["qwen/qwen3.8-27b"];
-  const primary = MODEL_IDS.has(requested) ? requested : "openai/gpt-oss-20b";
+  const needsDeeperReasoning =
+    prompt.length > 700 ||
+    /\b(solve|prove|derive|calculate|debug|refactor|step by step|physics|chemistry|mathematics|theorem|proof|analyze deeply|compare in detail)\b/i.test(prompt) ||
+    /(সমাধান কর|প্রমাণ কর|ধাপে ধাপে|গণনা কর|বিশ্লেষণ কর|পদার্থবিজ্ঞান|রসায়ন|গণিত)/i.test(prompt);
+  const automaticPrimary = needsDeeperReasoning
+    ? "openai/gpt-oss-120b"
+    : "openai/gpt-oss-20b";
+  const primary = requested === "auto"
+    ? automaticPrimary
+    : MODEL_IDS.has(requested)
+      ? requested
+      : automaticPrimary;
   const fallback = [
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
@@ -61,6 +72,7 @@ function selectModels(requested: string, hasImage: boolean): string[] {
 async function startGroqStream(
   messages: Array<Record<string, unknown>>,
   models: string[],
+  thinking: boolean,
 ): Promise<{ response: Response; model: string }> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new HttpError(503, "Backend setup is incomplete: GROQ_API_KEY is missing.");
@@ -81,6 +93,9 @@ async function startGroqStream(
           stream: true,
           temperature: 0.35,
           max_tokens: 8192,
+          reasoning_effort: model === "qwen/qwen3.8-27b"
+            ? (thinking ? "high" : "none")
+            : (thinking ? "medium" : "low"),
         }),
         signal: AbortSignal.timeout(22_000),
       });
@@ -343,8 +358,9 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const requestedModel = typeof body.model === "string" ? body.model : "openai/gpt-oss-20b";
-    const models = selectModels(requestedModel, Boolean(image));
-    const selected = await startGroqStream(groqMessages, models);
+    const thinking = body.thinking !== false;
+    const models = selectModels(requestedModel, Boolean(image), prompt);
+    const selected = await startGroqStream(groqMessages, models, thinking);
     const assistantMessageId = randomUUID();
     const responseModel = selected.model;
     const conversationForStream = conversationId;
