@@ -263,6 +263,7 @@ class ApiService {
     String? imageMimeType,
     required String model,
     required bool search,
+    required bool thinking,
   }) async* {
     final token = await _getSessionToken();
     String? imageDataUrl;
@@ -287,6 +288,7 @@ class ApiService {
         'imageDataUrl': imageDataUrl,
         'model': model,
         'search': search,
+        'thinking': thinking,
       });
 
     final response = await _client.send(request).timeout(
