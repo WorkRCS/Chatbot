@@ -81,6 +81,8 @@ class ChatMessage {
     this.sources = const [],
     this.generatedImage,
     this.generatedImageBytes,
+    this.attachmentAssetId,
+    this.attachmentStoredInR2 = false,
   });
 
   final bool isUser;
@@ -93,6 +95,8 @@ class ChatMessage {
   List<Map<String, dynamic>> sources;
   GeneratedImage? generatedImage;
   Uint8List? generatedImageBytes;
+  String? attachmentAssetId;
+  bool attachmentStoredInR2;
 }
 
 class ChatHome extends StatefulWidget {
@@ -257,6 +261,14 @@ class _ChatHomeState extends State<ChatHome> {
                   feedback: message.feedback,
                   sources: message.sources,
                   generatedImage: message.generatedImage,
+                  attachment: message.attachment == null
+                      ? null
+                      : PlatformFile(
+                          name: message.attachment!['name'] as String? ?? 'uploaded-image',
+                          size: 0,
+                        ),
+                  attachmentAssetId: message.attachment?['assetId'] as String?,
+                  attachmentStoredInR2: message.attachment?['storedInR2'] as bool? ?? false,
                 ))
             .toList();
       });
@@ -269,19 +281,39 @@ class _ChatHomeState extends State<ChatHome> {
 
   Future<void> _hydrateSavedImages() async {
     final pending = _messages.where((message) =>
-      message.generatedImage != null &&
-      message.generatedImage!.storedInR2 &&
-      message.generatedImageBytes == null).toList();
+      (message.generatedImage != null &&
+          message.generatedImage!.storedInR2 &&
+          message.generatedImageBytes == null) ||
+      (message.attachmentAssetId != null &&
+          message.attachmentStoredInR2 &&
+          message.attachment?.bytes == null)).toList();
 
     for (final message in pending) {
       try {
-        final image = message.generatedImage;
-        if (image == null) continue;
-        final bytes = await _api.downloadGeneratedImage(image);
-        if (!mounted) return;
-        setState(() => message.generatedImageBytes = bytes);
+        if (message.generatedImage != null &&
+            message.generatedImage!.storedInR2 &&
+            message.generatedImageBytes == null) {
+          final bytes = await _api.downloadGeneratedImage(message.generatedImage!);
+          if (!mounted) return;
+          setState(() => message.generatedImageBytes = bytes);
+        }
+
+        if (message.attachmentAssetId != null &&
+            message.attachmentStoredInR2 &&
+            message.attachment?.bytes == null) {
+          final bytes = await _api.downloadAsset(message.attachmentAssetId!);
+          if (!mounted) return;
+          setState(() {
+            final old = message.attachment;
+            message.attachment = PlatformFile(
+              name: old?.name ?? 'uploaded-image',
+              size: bytes.length,
+              bytes: bytes,
+            );
+          });
+        }
       } catch (_) {
-        // Keep the transcript usable when a saved asset is no longer accessible.
+        // Keep the transcript usable when an image is no longer accessible.
       }
     }
   }
