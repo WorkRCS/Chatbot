@@ -162,7 +162,10 @@ class _ChatHomeState extends State<ChatHome> {
   @override
   void initState() {
     super.initState();
-    if (ApiService.isConfigured) unawaited(_refreshHistory());
+    if (ApiService.isConfigured) {
+      _messages = [];
+      unawaited(_refreshHistory());
+    }
   }
 
   List<ChatMessage> _sampleMessages() => [
@@ -1731,12 +1734,26 @@ class _ChatHomeState extends State<ChatHome> {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                landscapeUrl,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                errorBuilder: (context, error, stack) => _landscapePlaceholder(),
-              ),
+              child: _generatedImageBytes != null
+                  ? Image.memory(
+                      _generatedImageBytes!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                    )
+                  : (_generatedImageUrl != null
+                      ? Image.network(
+                          _generatedImageUrl!,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                        )
+                      : Image.network(
+                          landscapeUrl,
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          errorBuilder: (context, error, stack) => _landscapePlaceholder(),
+                        )),
             ),
           ),
           const SizedBox(height: 13),
@@ -1745,12 +1762,12 @@ class _ChatHomeState extends State<ChatHome> {
             runSpacing: 8,
             children: [
               OutlinedButton.icon(
-                onPressed: () => _showInfo('Download will be enabled when image storage is connected.'),
+                onPressed: _downloadImage,
                 icon: const Icon(Icons.download_rounded, size: 16),
                 label: const Text('Download image'),
               ),
               FilledButton.icon(
-                onPressed: () => _showInfo('Real image generation will be wired to Cloudflare Workers AI.'),
+                onPressed: _generateImage,
                 icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('Regenerate'),
               ),
