@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { guestIdFromRequest } from "../server/auth";
 import { getDb } from "../server/db";
 import {
@@ -23,7 +24,7 @@ type StoredMessage = {
   model?: string;
   sources?: SearchSource[];
   createdAt: Date;
-  attachment?: { name: string; mimeType: string };
+  attachment?: { name: string; mimeType: string; assetId?: string; storedInR2?: boolean };
 };
 
 const MODEL_IDS = new Set([
@@ -132,6 +133,102 @@ function getImagePayload(value: unknown): { dataUrl: string; mimeType: string } 
     throw new HttpError(400, "Only JPEG, PNG, or WebP data-URL images are supported.");
   }
   return { dataUrl: value, mimeType: match[1] };
+}
+
+function getR2Client(): S3Client | null {
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+  return new S3Client({
+    region: "auto",
+    endpoint: "https://" + accountId + ".r2.cloudflarestorage.com",
+    credentials: { accessKeyId, secretAccessKey },
+  });
+}
+
+function imageBytes(image: { dataUrl: string }): Buffer {
+  const base64 = image.dataUrl.slice(image.dataUrl.indexOf(",") + 1);
+  return Buffer.from(base64, "base64");
+}
+
+async function persistUploadedImage(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: string,
+  conversationId: string,
+  prompt: string,
+  image: { dataUrl: string; mimeType: string },
+): Promise<{ name: string; mimeType: string; assetId: string; storedInR2: boolean }> {
+  const assetId = randomUUID();
+  const r2 = getR2Client();
+  const bucket = process.env.R2_BUCKET_NAME;
+  let objectKey: string | null = null;
+  let storedInR2 = false;
+
+  if (r2 && bucket) {
+    try {
+      const extension = image.mimeType === "image/png"
+        ? "png"
+        : image.mimeType === "image/webp"
+          ? "webp"
+          : "jpg";
+      objectKey = "uploads/" + userId + "/" + assetId + "." + extension;
+      await r2.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: objectKey,
+        Body: imageBytes(image),
+        ContentType: image.mimeType,
+        CacheControl: "private, max-age=3600",
+      }));
+      storedInR2 = true;
+    } catch (error) {
+      objectKey = null;
+      console.warn("[upload] R2 persistence failed", error instanceof Error ? error.name : "UnknownError");
+    }
+  }
+
+  await db.collection<any>("assets").insertOne({
+    _id: assetId,
+    userId,
+    conversationId,
+    type: "upload",
+    prompt: prompt.slice(0, 180),
+    mimeType: image.mimeType,
+    storage: storedInR2 ? "r2" : "inline",
+    objectKey,
+    createdAt: new Date(),
+  });
+
+  return { name: "uploaded-image", mimeType: image.mimeType, assetId, storedInR2 };
+}
+
+async function retrieveUploadedImageDataUrl(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: string,
+  assetId: string,
+): Promise<string | null> {
+  const asset = await db.collection<any>("assets").findOne({
+    _id: assetId,
+    userId,
+    type: "upload",
+    storage: "r2",
+  });
+  if (!asset || typeof asset.objectKey !== "string") return null;
+
+  const r2 = getR2Client();
+  const bucket = process.env.R2_BUCKET_NAME;
+  if (!r2 || !bucket) return null;
+
+  try {
+    const result = await r2.send(new GetObjectCommand({ Bucket: bucket, Key: asset.objectKey }));
+    const bytes = await result.Body?.transformToByteArray();
+    if (!bytes || bytes.length === 0) return null;
+    const mimeType = typeof asset.mimeType === "string" ? asset.mimeType : "image/jpeg";
+    return "data:" + mimeType + ";base64," + Buffer.from(bytes).toString("base64");
+  } catch (error) {
+    console.warn("[upload] could not retrieve prior image", error instanceof Error ? error.name : "UnknownError");
+    return null;
+  }
 }
 
 async function refreshConversationSummary(
@@ -295,15 +392,16 @@ export default async function handler(request: Request): Promise<Response> {
     previousMessages.reverse();
 
     const userMessageId = randomUUID();
+    const persistedAttachment = image
+      ? await persistUploadedImage(db, userId, conversationId, prompt, image)
+      : undefined;
     await messagesCollection.insertOne({
       _id: userMessageId,
       userId,
       conversationId,
       role: "user",
       content: prompt,
-      attachment: image
-        ? { name: "uploaded-image", mimeType: image.mimeType }
-        : undefined,
+      attachment: persistedAttachment,
       createdAt: now,
     });
 
@@ -338,11 +436,42 @@ export default async function handler(request: Request): Promise<Response> {
       );
     }
 
+    const previousImageMessages = previousMessages
+      .filter((message) =>
+        message.role === "user" &&
+        message.attachment?.storedInR2 === true &&
+        typeof message.attachment.assetId === "string",
+      )
+      .slice(-2);
+    const previousImageIds = new Set(previousImageMessages.map((message) => message._id));
+
+    const priorGroqMessages = await Promise.all(
+      previousMessages
+        .filter((message) => message.role === "user" || message.role === "assistant")
+        .map(async (message) => {
+          if (previousImageIds.has(message._id) && message.attachment?.assetId) {
+            const previousImage = await retrieveUploadedImageDataUrl(
+              db,
+              userId,
+              message.attachment.assetId,
+            );
+            if (previousImage) {
+              return {
+                role: message.role,
+                content: [
+                  { type: "text", text: message.content },
+                  { type: "image_url", image_url: { url: previousImage } },
+                ],
+              };
+            }
+          }
+          return { role: message.role, content: message.content };
+        }),
+    );
+
     const groqMessages: Array<Record<string, unknown>> = [
       { role: "system", content: systemParts.join("\n\n") },
-      ...previousMessages
-        .filter((message) => message.role === "user" || message.role === "assistant")
-        .map((message) => ({ role: message.role, content: message.content })),
+      ...priorGroqMessages,
     ];
 
     if (image) {
