@@ -274,6 +274,13 @@ class _ChatHomeState extends State<ChatHome> {
     }
   }
 
+  String _mimeTypeForImage(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
   Future<void> _sendMessage() async {
     final rawPrompt = _composer.text.trim();
     if ((rawPrompt.isEmpty && _attachedImage == null) || _busy) return;
@@ -290,7 +297,89 @@ class _ChatHomeState extends State<ChatHome> {
     });
     _scrollToBottom();
 
-    // Frontend-only demo: this simulated reply will be replaced by the API stream.
+    if (ApiService.isConfigured) {
+      try {
+        await for (final event in _api.streamChat(
+          prompt: prompt,
+          conversationId: _activeConversationId,
+          imageBytes: attachment?.bytes,
+          imageMimeType: attachment == null ? null : _mimeTypeForImage(attachment.name),
+          model: _model,
+          search: _searchOn,
+        )) {
+          if (!mounted) return;
+          if (event.type == 'meta') {
+            setState(() {
+              _activeConversationId = event.conversationId ?? _activeConversationId;
+              if (_messages.isNotEmpty && !_messages.last.isUser) {
+                _messages.last
+                  ..id = event.messageId
+                  ..sources = event.sources;
+              }
+            });
+          } else if (event.type == 'token' && event.token != null) {
+            setState(() {
+              if (_messages.isNotEmpty && !_messages.last.isUser) {
+                _messages.last
+                  ..isLoading = false
+                  ..text += event.token!;
+              }
+            });
+            _scrollToBottom();
+          } else if (event.type == 'error') {
+            setState(() {
+              if (_messages.isNotEmpty && !_messages.last.isUser) {
+                final pending = _messages.last;
+                pending.isLoading = false;
+                if (pending.text.isEmpty) {
+                  pending.text = event.error ?? 'The response was interrupted. Please retry.';
+                } else {
+                  pending.text += '\n\n' + (event.error ?? 'The response was interrupted.');
+                }
+              }
+              _busy = false;
+            });
+          } else if (event.type == 'done') {
+            setState(() {
+              if (_messages.isNotEmpty && !_messages.last.isUser) {
+                _messages.last
+                  ..isLoading = false
+                  ..id = event.messageId ?? _messages.last.id;
+              }
+              _busy = false;
+            });
+            unawaited(_refreshHistory());
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            if (_messages.isNotEmpty && !_messages.last.isUser) {
+              _messages.last.isLoading = false;
+            }
+            _busy = false;
+          });
+        }
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          if (_messages.isNotEmpty && !_messages.last.isUser) {
+            final pending = _messages.last;
+            pending.isLoading = false;
+            if (pending.text.isEmpty) {
+              pending.text = 'Request failed: ' + error.toString();
+            } else {
+              pending.text += '\n\nResponse interrupted: ' + error.toString();
+            }
+          }
+          _busy = false;
+        });
+      }
+      _scrollToBottom();
+      return;
+    }
+
+    // UI-only fallback used until API_BASE_URL is supplied at build time.
     await Future<void>.delayed(const Duration(milliseconds: 1100));
     if (!mounted) return;
     setState(() {
