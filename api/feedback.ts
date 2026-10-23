@@ -23,19 +23,19 @@ export default async function handler(request: Request): Promise<Response> {
     }
 
     const db = await getDb();
-    const message = await db.collection("messages").findOne({
+    const message = await db.collection<any>("messages").findOne({
       _id: messageId,
       userId,
       role: "assistant",
     });
     if (!message) return json(request, { error: "Assistant message not found." }, 404);
 
-    await db.collection("messages").updateOne(
+    await db.collection<any>("messages").updateOne(
       { _id: messageId, userId },
       { $set: { feedback: reaction, feedbackUpdatedAt: new Date() } },
     );
 
-    await db.collection("feedback").updateOne(
+    await db.collection<any>("feedback").updateOne(
       { userId, messageId },
       {
         $set: { reaction, updatedAt: new Date(), conversationId: message.conversationId },
